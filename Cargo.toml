@@ -1,0 +1,30 @@
+[package]
+name = "sc_hla_count"
+version = "0.0.0"
+authors = ["Charlotte Darby <cdarby@jhu.edu>", "Ian Fiddes <ian.fiddes@10xgenomics.com>", "Patrick Marks <patrick@10xgenomics.com>"]
+
+[dependencies]
+bio = "0.25"
+clap = "*"
+csv = "1"
+debruijn = { git = "https://github.com/10XGenomics/rust-debruijn"}
+debruijn_mapping = { git = "https://github.com/cdarby/rust-pseudoaligner" }
+docopt = "*"
+failure = "*"
+human-panic = "1.0.1"
+itertools = "*"
+log = "*"
+regex = "1"
+rust-htslib = "0.24"
+serde = "1.0"
+simplelog = "0.5.0"
+sprs = "*"
+tempfile = "*"
+terminal_size = "*"
+
+[dependencies.smallvec]
+features = ["serde"]
+version = "0.6.8"
+
+[profile.release]
+debug = true
