@@ -336,8 +336,15 @@ pub fn mapping_wrapper(hla_index: PathBuf, outdir: PathBuf, bam: PathBuf, locus:
                 long_aln += 1;
                 eq_counts.count(&rec.key.barcode, &rec.key.umi, &EqClass::from_slice(&eq_class));
             }
+        } else {
+            if let Some((eq_class, cov)) = index.map_read(&rec.sequence.reverse()) {
+                some_aln += 1;
+                if cov > MIN_SCORE_CALL {                                
+                    long_aln += 1;
+                    eq_counts.count(&rec.key.barcode, &rec.key.umi, &EqClass::from_slice(&eq_class));
+                }
+            }
         }
-
         if rid % 100_000 == 0 {
             info!("analyzed {} reads. Mapped {} with score at least {}, used {} with score at least {}", 
                 rid, some_aln, READ_COVERAGE_THRESHOLD, long_aln, MIN_SCORE_CALL);
@@ -463,23 +470,32 @@ pub fn map_and_count(bam : PathBuf, out_dir: &str, barcodes: &HashMap<Barcode, u
             continue;
         }
         
+                
         let mut aln = cds_index.map_read(&rec.sequence);
-        
+        let mut cds_rev_aln = cds_index.map_read(&rec.sequence.reverse());
+        let mut gen_aln = genomic_index.map_read(&rec.sequence);
+        let mut gen_rev_aln = genomic_index.map_read(&rec.sequence.reverse());
+
         if let Some((_, cov)) = aln {
-            if cov < MIN_SCORE_COUNT {
-                aln = genomic_index.map_read(&rec.sequence);
-                if let Some((_, cov)) = aln {
-                    if cov < MIN_SCORE_COUNT { metrics.num_not_aligned += 1; continue; } //doesn't align to CDS or GEN with high enough score
-                    else { metrics.num_gen_align += 1; }
-                } else { metrics.num_not_aligned += 1; continue; } //doesn't align to either at all
-            } else { metrics.num_cds_align += 1; }
-        } else { //doesn't align to CDS at all
-            aln = genomic_index.map_read(&rec.sequence);
-            if let Some((_, cov)) = aln {
-                if cov < MIN_SCORE_COUNT { continue; } //doesn't align to CDS or GEN with high enough score
-                else { metrics.num_gen_align += 1; }
-            } else { metrics.num_not_aligned += 1; continue; } //doesn't align to CDS or GEN at all
-        }
+            if cov > MIN_SCORE_COUNT { 
+                metrics.num_cds_align += 1;
+            }
+        } else if let Some((_, cov)) = cds_rev_aln {
+            if cov > MIN_SCORE_COUNT {
+                metrics.num_cds_align += 1;
+                aln = cds_rev_aln;               
+            }
+        } else if let Some((_, cov)) = gen_aln {
+            if cov > MIN_SCORE_COUNT {
+                metrics.num_gen_align += 1;
+                aln = gen_aln;
+            }
+        } else if let Some((_, cov)) = gen_rev_aln {
+            if cov > MIN_SCORE_COUNT {
+                metrics.num_gen_align += 1;
+                aln = gen_rev_aln;
+            }
+        } else { metrics.num_not_aligned += 1; }
         
         if let Some((cls, cov)) = aln { 
             if let Some((max_gene, max_allele)) = eq_class_to_gene.get(&cls) {
@@ -492,9 +508,9 @@ pub fn map_and_count(bam : PathBuf, out_dir: &str, barcodes: &HashMap<Barcode, u
                 };
                 scores.push(s);
             }
-        } else { metrics.num_not_aligned += 1; }
+        }
     }
-    debug!("{} reads aligned to a single-gene equivalence class", scores.len());
+    info!("{} reads aligned to a single-gene equivalence class", scores.len());
 
    let mut entries = Vec::new();
    for (cell_index, cell_scores) in &scores.iter().sorted_by_key(|s| &s.cell_index).group_by(|s| &s.cell_index) {
@@ -527,7 +543,7 @@ pub fn map_and_count(bam : PathBuf, out_dir: &str, barcodes: &HashMap<Barcode, u
                         max_allele_this_umi = 0; //allele 1
                     } else if (frq.1 as f64 > ALLELE_CONSENSUS_THRESHOLD * nreads) && (ALLELE_CONSENSUS_THRESHOLD * nreads > frq.0 as f64) {
                         max_allele_this_umi = 1; //allele 2
-                    } else if (ALLELE_CONSENSUS_THRESHOLD * nreads > frq.0 as f64) && (ALLELE_CONSENSUS_THRESHOLD * nreads > frq.1 as f64){
+                    } else {    
                         max_allele_this_umi = 2; //gene
                     }
                 }
