@@ -167,6 +167,97 @@ pub fn read_hla_cds(
     Ok((seqs, tx_ids))
 }
 
+pub fn read_hla_cds_string(
+    reader: fasta::Reader<impl Read>,
+    allele_set: HashSet<String>,
+    use_filter: bool,
+) -> Result<(Vec<Vec<u8>>, Vec<String>), Error> {
+    //TODO make these arguments or config variables
+    let genes = [b"A".to_vec(),b"B".to_vec(),b"C".to_vec(),
+    b"DRB1".to_vec(),b"DPA1".to_vec(),b"DPB1".to_vec(),b"DQA1".to_vec(),b"DQB1".to_vec()];
+    let mut seqs = Vec::new();
+    let mut transcript_counter = 0;
+    let mut tx_ids = Vec::new();
+    let allele_parser = AlleleParser::new();
+
+    info!("Starting reading the Fasta file");
+    let mut hlas = Vec::new();
+    for result in reader.records() {
+        let record = result?;
+        
+        let dna_string = DnaString::from_acgt_bytes(record.seq());
+        let allele_str = record.desc().ok_or_else(|| format_err!("no HLA allele"))?;
+        let allele_str = allele_str.split(' ').next().ok_or_else(||format_err!("no HLA allele"))?;
+        if use_filter && !allele_set.contains(&allele_str.to_string()) { continue; }
+        
+        let allele = allele_parser.parse(allele_str)?;
+        if genes.contains(&allele.gene) {
+            let tx_id = record.id().to_string();
+            let data = (allele, tx_id, allele_str.to_string(), dna_string);
+            hlas.push(data);
+        }
+    }
+
+    hlas.sort();
+
+    let mut lengths = HashMap::new();
+
+    // If we are not filtering using the external database, do this step
+    if !use_filter {
+        // All the alleles with a common 2-digit prefix must have the same length -- they can only differ by an synonymous mutation.
+        // Collate these lengths so that we can filter out non-full length sequences.
+        for (two_digit, alleles) in &hlas.iter().group_by(|v| (v.0.gene.clone(), v.0.f1, v.0.f2)) {
+    
+            let mut ma: Vec<_> = alleles.collect();
+            //println!("td: {:?}, alleles: {:?}", two_digit, ma.len());
+    
+            // Pick the longest representative
+            ma.sort_by_key(|v| v.3.len());
+            let longest = ma.pop().unwrap();
+            let (_, _, _, dna_string) = longest;
+    
+            lengths.insert(two_digit.clone(), dna_string.len());
+        }
+    }
+    
+    for (three_digit, alleles) in &hlas.iter().group_by(|v| (v.0.gene.clone(), v.0.f1, v.0.f2, v.0.f3)) {
+
+        let mut ma: Vec<_> = alleles.collect();
+        //println!("td: {:?}, alleles: {:?}", three_digit, ma.len());
+
+        // Pick the longest representative
+        ma.sort_by_key(|v| v.3.len());
+
+        let longest = ma.pop().unwrap();
+        let (_, _, allele_str, dna_string) = longest;
+
+        // Get the length of longest 2-digit entry
+        if !use_filter {
+            let req_len = lengths[&(three_digit.0.clone(), three_digit.1, three_digit.2)];
+    
+            let mylen = dna_string.len();
+    
+            //println!("td: {:?}, alleles: {:?}, max_len: {}, req_len: {}", three_digit, nalleles, mylen, req_len);
+    
+            if mylen >= req_len {
+                //TODO
+                //the CDS only has three-digit resolution so having more than that in allele_str is misleading
+                //when that's reported as the HLA type
+                seqs.push(dna_string.clone().to_ascii_vec());
+                tx_ids.push(allele_str.to_string());
+                transcript_counter += 1;
+            }
+        } else {
+            seqs.push(dna_string.clone().to_ascii_vec());
+            tx_ids.push(allele_str.to_string());
+            transcript_counter += 1;
+        }
+    }
+
+    info!( "Read {} Alleles, deduped into {} full-length 3-digit alleles", hlas.len(), transcript_counter);
+    Ok((seqs, tx_ids))
+}
+
 pub fn make_hla_index(hla_fasta: PathBuf, hla_index: PathBuf, allele_status: PathBuf) -> Result<PathBuf, Error> {
     info!("Building index from fasta");
     let mut allele_set = HashSet::new();

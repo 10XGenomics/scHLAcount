@@ -37,7 +37,7 @@ use std::io::{BufRead, BufReader, BufWriter, Write};
 
 
 mod mapping;
-use mapping::{mapping_wrapper, map_and_count};
+use mapping::{mapping_wrapper, map_and_count_pseudo, map_and_count_sw};
 
 mod em;
 use em::{em_wrapper};
@@ -49,7 +49,7 @@ mod locus;
 use locus::Locus;
 
 mod config;
-use config::{Barcode, MIN_SCORE_COUNT};
+use config::Barcode;
 
 fn get_args() -> clap::App<'static, 'static> {
     App::new("scHLAcount")
@@ -121,6 +121,9 @@ fn get_args() -> clap::App<'static, 'static> {
     .arg(Arg::with_name("primary_alignments")
          .long("primary-alignments")
          .help("If specified, will use primary alignments only"))
+    .arg(Arg::with_name("exact_count")
+         .long("use-exact-count")
+         .help("If specified, will use exact alignment to allele sequences to count moleucles (very slow!)"))
     .arg(Arg::with_name("unmapped")
          .long("unmapped")
          .help("If specified, will also use unmapped reads for genotyping (very slow!)"))
@@ -154,6 +157,7 @@ fn _main(cli_args: Vec<String>) -> Result<(), Error> {
     let region = args.value_of("region").unwrap_or_default();
     let out_dir = args.value_of("out_dir").unwrap_or_default();
     let primary_only = args.is_present("primary_alignments");
+    let exact_count = args.is_present("exact_count");
     let use_unmapped = args.is_present("unmapped");
     let ll = args.value_of("log_level").unwrap();
 
@@ -202,7 +206,11 @@ fn _main(cli_args: Vec<String>) -> Result<(), Error> {
     check_inputs_exist_fasta(&cds, &genomic)?;
     
     let cell_barcodes = load_barcodes(&cell_barcodes).unwrap();
-    let (entries, nrows, metrics, rownames) = map_and_count(bam_file, &out_dir, &cell_barcodes, &region, cds, genomic, primary_only)?;
+    let (entries, nrows, metrics, rownames) = if exact_count { 
+            map_and_count_sw(bam_file, &out_dir, &cell_barcodes, &region, cds, genomic, primary_only)? 
+        } else {
+            map_and_count_pseudo(bam_file, &out_dir, &cell_barcodes, &region, cds, genomic, primary_only)?
+        };
     
     
     info!("Initialized a {} features x {} cell barcodes matrix", nrows, cell_barcodes.len());
@@ -216,7 +224,7 @@ fn _main(cli_args: Vec<String>) -> Result<(), Error> {
         info!("Number of alignments that were not primary: {}", metrics.num_non_primary);
     }
     info!("Number of alignments skipped due to not being associated with a cell barcode in the list provided: {}", metrics.num_not_cell_bc);
-    info!("Number of reads with no alignment score > {}: {}", MIN_SCORE_COUNT, metrics.num_not_aligned);
+    info!("Number of reads with no alignment score above threshold: {}", metrics.num_not_aligned);
     info!("Number of alignments to CDS sequence: {}", metrics.num_cds_align);
     info!("Number of alignments to genomic sequence: {}", metrics.num_gen_align);
         

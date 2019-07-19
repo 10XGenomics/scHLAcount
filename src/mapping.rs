@@ -1,3 +1,7 @@
+use bio::alignment::pairwise::banded::Aligner;
+use bio::alignment::pairwise::Scoring;
+use bio::alignment::sparse::*;
+use bio::alphabets::dna;
 use bio::io::fasta;
 use debruijn::dna_string::DnaString;
 use debruijn_mapping::config::{KmerType,READ_COVERAGE_THRESHOLD};
@@ -13,9 +17,18 @@ use std::fs::File;
 use std::io::{BufWriter, Write};
 use std::path::PathBuf;
 
-use crate::hla::{Allele, AlleleParser, read_hla_cds};
+use crate::hla::{Allele, AlleleParser, read_hla_cds, read_hla_cds_string};
 use crate::locus::Locus;
-use crate::config::{PROC_BC_SEQ_TAG,PROC_UMI_SEQ_TAG, Barcode, Umi, EqClass, MIN_SCORE_CALL, MIN_SCORE_COUNT, GENE_CONSENSUS_THRESHOLD,ALLELE_CONSENSUS_THRESHOLD};
+use crate::config::{PROC_BC_SEQ_TAG,PROC_UMI_SEQ_TAG, Barcode, Umi, EqClass, MIN_SCORE_CALL, 
+                    MIN_SCORE_COUNT_PSEUDO, MIN_SCORE_COUNT_ALIGNMENT, 
+                    GENE_CONSENSUS_THRESHOLD,ALLELE_CONSENSUS_THRESHOLD};
+
+const K: usize = 5;  // kmer match length
+const W: usize = 20;  // Window size for creating the band
+const MATCH: i32 = 1;  // Match score
+const MISMATCH: i32 = -1; // Mismatch score
+const GAP_OPEN: i32 = -3; // Gap open score
+const GAP_EXTEND: i32 = -1;  // Gap extend score
 
 /* Structs */
 
@@ -227,9 +240,9 @@ impl Iterator for BamSeqReader {
             
             // Get original read sequence from record.
             let mut sequence = DnaString::from_acgt_bytes(&self.tmp_record.seq().as_bytes());
-            if !self.tmp_record.is_reverse() {
-                sequence = sequence.reverse();
-            }
+//            if !self.tmp_record.is_reverse() {
+//                sequence = sequence.reverse(); //this does not complement, just reverses
+//            }
 
             let barcode = match self.tmp_record.aux(PROC_BC_SEQ_TAG).map(|x| Barcode::from_slice(x.string())) {
                 Some(bc) => bc,
@@ -336,13 +349,11 @@ pub fn mapping_wrapper(hla_index: PathBuf, outdir: PathBuf, bam: PathBuf, locus:
                 long_aln += 1;
                 eq_counts.count(&rec.key.barcode, &rec.key.umi, &EqClass::from_slice(&eq_class));
             }
-        } else {
-            if let Some((eq_class, cov)) = index.map_read(&rec.sequence.reverse()) {
-                some_aln += 1;
-                if cov > MIN_SCORE_CALL {                                
-                    long_aln += 1;
-                    eq_counts.count(&rec.key.barcode, &rec.key.umi, &EqClass::from_slice(&eq_class));
-                }
+        } else if let Some((eq_class, cov)) = index.map_read(&DnaString::from_acgt_bytes(dna::revcomp(&rec.sequence.to_ascii_vec()).as_slice())) {
+            some_aln += 1;
+            if cov > MIN_SCORE_CALL {
+                long_aln += 1;
+                eq_counts.count(&rec.key.barcode, &rec.key.umi, &EqClass::from_slice(&eq_class));
             }
         }
         if rid % 100_000 == 0 {
@@ -380,20 +391,206 @@ pub fn mapping_wrapper(hla_index: PathBuf, outdir: PathBuf, bam: PathBuf, locus:
     write_obj(&eq_counts, &hits_file)?;
     Ok(hits_file)
 }
+#[allow(clippy::cognitive_complexity)] 
+pub fn map_and_count_sw(bam : PathBuf, out_dir: &str, barcodes: &HashMap<Barcode, u32>, locus: &Locus, cds: PathBuf, genomic: PathBuf, primary_only: bool) -> Result<(Vec<MatrixEntry>, usize, Metrics, Vec<String>), Error> {
+    let fa : fasta::Reader<File> = fasta::Reader::from_file(genomic)?;
+    let (seqs_gen, tx_names_gen) = read_hla_cds_string(fa, HashSet::new(), false)?;
+    let mut genomic_kmer_hashes : Vec<(&String, HashMapFx<&[u8], Vec<u32>>, &[u8])> = Vec::new();
+    for (i, s) in seqs_gen.iter().enumerate() {
+        genomic_kmer_hashes.push((&tx_names_gen[i], hash_kmers(s, K),s));
+    }
+    info!("Indexed genome sequences for SW alignment");
+    
+    let fa : fasta::Reader<File> = fasta::Reader::from_file(cds)?;
+    let (seqs_cds, tx_names_cds) = read_hla_cds_string(fa, HashSet::new(), false)?;
+    let mut cds_kmer_hashes : Vec<(&String, HashMapFx<&[u8], Vec<u32>>, &[u8])> = Vec::new();
+    for (i, s) in seqs_cds.iter().enumerate() {
+        cds_kmer_hashes.push((&tx_names_cds[i], hash_kmers(s, K),s));
+    }
+    info!("Indexed CDS sequences for SW alignment");
+    
+    // Sequences must be in the same order in CDS and GEN. 
+    // Have to assume they have the same set of names, though, for the next steps to work!
+    genomic_kmer_hashes.sort_by_key(|x| x.0);
+    cds_kmer_hashes.sort_by_key(|x| x.0);
+    
+    //Local alignment
+    let scoring = Scoring {
+        gap_open: GAP_OPEN,
+        gap_extend: GAP_EXTEND,
+        match_fn: |a: u8, b: u8| if a == b {MATCH} else {MISMATCH},
+        match_scores: Some((MATCH, MISMATCH)),
+        xclip_prefix: 0,
+        xclip_suffix: 0,
+        yclip_prefix: 0,
+        yclip_suffix: 0,
+    };
+    let mut aligner = Aligner::with_scoring(scoring, K, W);
+    
+    
+    let mut itr = BamSeqReader::new(IndexedReader::from_path(bam)?);
+    itr.fetch(locus);
+    
+    // what equivalence class corresponds to a gene or an allele?
+    let allele_parser = AlleleParser::new();
+    let mut alleles_cds: Vec<(Allele, u32)> = Vec::new();
+    for (i,t) in tx_names_cds.iter().enumerate() {
+        if let Ok(a) = allele_parser.parse(t) {
+            alleles_cds.push((a,i as u32));
+        }
+    }
+    
+    // Mapping of genes/alleles to row numbers in the matrix
+    let d: PathBuf = [out_dir,"labels.tsv"].iter().collect();
+    let mut labels_file = BufWriter::new(File::create(d).unwrap());
+    let mut eq_class_to_gene: HashMap<Vec<u32>,(Vec<u8>, usize)> = HashMap::new();
+    let mut genes_to_rownums : HashMap<Vec<u8>,usize> = HashMap::new();
+    let mut nrows : usize = 0;
+    let mut rownames : Vec<String> = Vec::new();
+    for (g, mut a_group) in &alleles_cds.iter().sorted_by_key(|a| &a.0.gene).group_by(|a| &a.0.gene) {
+        genes_to_rownums.insert(g.clone(), nrows);
+        let a1 = a_group.next().unwrap();
+        eq_class_to_gene.insert(vec![a1.1], (g.clone(),0));
+        if let Some(a2) = a_group.next() { //two alleles : three rows
+            eq_class_to_gene.insert(vec![a2.1], (g.clone(),1));
+            let mut x = vec![a1.1, a2.1];
+            x.sort();
+            eq_class_to_gene.insert(x.to_owned(), (g.clone(),2));
+            nrows += 3;
+            
+            writeln!(labels_file, "{}", String::from_utf8(a1.0.name.clone()).unwrap())?;
+            writeln!(labels_file, "{}", String::from_utf8(a2.0.name.clone()).unwrap())?;
+            writeln!(labels_file, "{}", String::from_utf8(g.clone().to_vec()).unwrap())?;
+            rownames.push(String::from_utf8(a1.0.name.clone()).unwrap());
+            rownames.push(String::from_utf8(a2.0.name.clone()).unwrap());
+            rownames.push(String::from_utf8(g.clone().to_vec()).unwrap());
+        } else { // only one allele : one row
+            nrows += 1;
+            writeln!(labels_file, "{}", String::from_utf8(a1.0.name.clone()).unwrap())?;
+            rownames.push(String::from_utf8(a1.0.name.clone()).unwrap());
+
+        }
+    }
+    labels_file.flush()?;
+
+    let mut metrics: Metrics = Metrics {
+        num_reads: 0,
+        num_non_primary: 0,
+        num_not_cell_bc: 0,
+        num_not_aligned: 0,
+        num_cds_align: 0,
+        num_gen_align: 0,
+    };
+    
+    let mut scores: Vec<Scores> = Vec::new();
+    for _rec in itr {
+        let rec = _rec?;
+        metrics.num_reads += 1;
+        if metrics.num_reads % 100_000 == 0 {
+            info!("analyzed {} reads. Mapped {} with score at least {}", 
+                metrics.num_reads, metrics.num_gen_align+metrics.num_cds_align, MIN_SCORE_COUNT_ALIGNMENT);
+        }
+
+        if !rec.primary {
+            metrics.num_non_primary += 1;
+            if primary_only { continue; }
+        }
+        
+        // iterator only returns reads with CB and UB but it might not be in the list
+        if !barcodes.contains_key(&rec.key.barcode) {
+            metrics.num_not_cell_bc += 1;
+            continue;
+        }
+        
+        let mut max_score: i32 = 0;
+        let mut cls: Vec<u32> = Vec::new();
+        
+        let seq = rec.sequence;
+        let read = seq.to_ascii_vec();
+        let read = read.as_slice();
+        let read_rev = dna::revcomp(seq.to_ascii_vec());
+        let read_rev = read_rev.as_slice();
+        
+        //align to cds sequences
+        for (i,h) in cds_kmer_hashes.iter().enumerate() {
+            //align fwd read
+            let aln = aligner.custom_with_prehash(read,h.2,&h.1);
+            if aln.score > max_score {
+                cls = vec![i as u32];
+                max_score = aln.score;
+            } else if aln.score == max_score {
+                cls.push(i as u32);
+            }
+            //align reverse read
+            let aln = aligner.custom_with_prehash(read_rev,h.2,&h.1);
+            if aln.score > max_score {
+                cls = vec![i as u32];
+                max_score = aln.score;
+            } else if aln.score == max_score {
+                cls.push(i as u32);
+            }
+        }
+        
+        //if necessary, align to genomic sequences
+        if max_score < MIN_SCORE_COUNT_ALIGNMENT as i32 {
+            cls = Vec::new();
+            for (i,h) in genomic_kmer_hashes.iter().enumerate() {
+                //align fwd read
+                let aln = aligner.custom_with_prehash(read,h.2,&h.1);
+                if aln.score > max_score {
+                    cls = vec![i as u32];
+                    max_score = aln.score;
+                } else if aln.score == max_score {
+                    cls.push(i as u32);
+                }
+                //align reverse read
+                let aln = aligner.custom_with_prehash(read_rev,h.2,&h.1);
+                if aln.score > max_score {
+                    cls = vec![i as u32];
+                    max_score = aln.score;
+                } else if aln.score == max_score {
+                    cls.push(i as u32);
+                }
+            }
+            if max_score >= MIN_SCORE_COUNT_ALIGNMENT as i32 { metrics.num_gen_align += 1; }
+        } else { metrics.num_cds_align += 1; }
+        //println!("{}",max_score);
+        if max_score >= MIN_SCORE_COUNT_ALIGNMENT as i32 { 
+            if let Some((max_gene, max_allele)) = eq_class_to_gene.get(&cls) {
+                let s = Scores {
+                    cell_index: *barcodes.get(&rec.key.barcode).unwrap(),
+                    umi: rec.key.umi,
+                    max_score,
+                    max_gene: max_gene.clone(),
+                    max_allele: *max_allele,
+                };
+                //debug!("{:?}",&s);
+                scores.push(s);
+            }
+        } else { metrics.num_not_aligned += 1; }
+    }
+    info!("analyzed {} reads. Mapped {} with score at least {}", 
+        metrics.num_reads, metrics.num_gen_align+metrics.num_cds_align, MIN_SCORE_COUNT_ALIGNMENT);
+    info!("{} reads aligned to a single-gene equivalence class", scores.len());
+    
+    let entries = count(&scores, genes_to_rownums, nrows);
+    Ok((entries, nrows, metrics, rownames))
+}
+
 
 #[allow(clippy::cognitive_complexity)] 
-pub fn map_and_count(bam : PathBuf, out_dir: &str, barcodes: &HashMap<Barcode, u32>, locus: &Locus, cds: PathBuf, genomic: PathBuf, primary_only: bool) -> Result<(Vec<MatrixEntry>, usize, Metrics, Vec<String>), Error> {
+pub fn map_and_count_pseudo(bam : PathBuf, out_dir: &str, barcodes: &HashMap<Barcode, u32>, locus: &Locus, cds: PathBuf, genomic: PathBuf, primary_only: bool) -> Result<(Vec<MatrixEntry>, usize, Metrics, Vec<String>), Error> {
     let fa : fasta::Reader<File> = fasta::Reader::from_file(genomic)?;
     let (seqs, tx_names) = read_hla_cds(fa, HashSet::new(), false)?;
     let tx_gene_map = HashMap::new();
     let genomic_index = debruijn_mapping::build_index::build_index::<debruijn_mapping::config::KmerType>(
         &seqs, &tx_names, &tx_gene_map )?;
-    info!("Built genome index");
+    info!("Built genome index for pseudoalignment");
     let fa : fasta::Reader<File> = fasta::Reader::from_file(cds)?;
     let (seqs, tx_names) = read_hla_cds(fa, HashSet::new(), false)?;
     let cds_index = debruijn_mapping::build_index::build_index::<debruijn_mapping::config::KmerType>(
         &seqs, &tx_names, &tx_gene_map )?;
-    info!("Built CDS index");
+    info!("Built CDS index for pseudoalignment");
 
     let mut itr = BamSeqReader::new(IndexedReader::from_path(bam)?);
     itr.fetch(locus);
@@ -437,7 +634,6 @@ pub fn map_and_count(bam : PathBuf, out_dir: &str, barcodes: &HashMap<Barcode, u
 
         }
     }
-    //println!("{:?}",genes_to_rownums);
     labels_file.flush()?;
 
 
@@ -456,7 +652,7 @@ pub fn map_and_count(bam : PathBuf, out_dir: &str, barcodes: &HashMap<Barcode, u
         metrics.num_reads += 1;
         if metrics.num_reads % 100_000 == 0 {
             info!("analyzed {} reads. Mapped {} with score at least {}", 
-                metrics.num_reads, metrics.num_gen_align+metrics.num_cds_align, MIN_SCORE_COUNT);
+                metrics.num_reads, metrics.num_gen_align+metrics.num_cds_align, MIN_SCORE_COUNT_PSEUDO);
         }
 
         if !rec.primary {
@@ -472,26 +668,27 @@ pub fn map_and_count(bam : PathBuf, out_dir: &str, barcodes: &HashMap<Barcode, u
         
                 
         let mut aln = cds_index.map_read(&rec.sequence);
-        let mut cds_rev_aln = cds_index.map_read(&rec.sequence.reverse());
         let mut gen_aln = genomic_index.map_read(&rec.sequence);
-        let mut gen_rev_aln = genomic_index.map_read(&rec.sequence.reverse());
+        let seq_rev: DnaString = DnaString::from_acgt_bytes(dna::revcomp(&rec.sequence.to_ascii_vec()).as_slice());
+        let mut cds_rev_aln = cds_index.map_read(&seq_rev);
+        let mut gen_rev_aln = genomic_index.map_read(&seq_rev);
 
         if let Some((_, cov)) = aln {
-            if cov > MIN_SCORE_COUNT { 
+            if cov > MIN_SCORE_COUNT_PSEUDO { 
                 metrics.num_cds_align += 1;
             }
         } else if let Some((_, cov)) = cds_rev_aln {
-            if cov > MIN_SCORE_COUNT {
+            if cov > MIN_SCORE_COUNT_PSEUDO {
                 metrics.num_cds_align += 1;
                 aln = cds_rev_aln;               
             }
         } else if let Some((_, cov)) = gen_aln {
-            if cov > MIN_SCORE_COUNT {
+            if cov > MIN_SCORE_COUNT_PSEUDO {
                 metrics.num_gen_align += 1;
                 aln = gen_aln;
             }
         } else if let Some((_, cov)) = gen_rev_aln {
-            if cov > MIN_SCORE_COUNT {
+            if cov > MIN_SCORE_COUNT_PSEUDO {
                 metrics.num_gen_align += 1;
                 aln = gen_rev_aln;
             }
@@ -510,10 +707,17 @@ pub fn map_and_count(bam : PathBuf, out_dir: &str, barcodes: &HashMap<Barcode, u
             }
         }
     }
+    info!("analyzed {} reads. Mapped {} with score at least {}", 
+            metrics.num_reads, metrics.num_gen_align+metrics.num_cds_align, MIN_SCORE_COUNT_PSEUDO);
     info!("{} reads aligned to a single-gene equivalence class", scores.len());
 
-   let mut entries = Vec::new();
-   for (cell_index, cell_scores) in &scores.iter().sorted_by_key(|s| &s.cell_index).group_by(|s| &s.cell_index) {
+    let entries = count(&scores, genes_to_rownums, nrows);
+    Ok((entries, nrows, metrics, rownames))
+}
+
+pub fn count(scores : &[Scores], genes_to_rownums: HashMap<Vec<u8>,usize>, nrows: usize, ) -> Vec<MatrixEntry> {
+    let mut entries : Vec<MatrixEntry> = Vec::new();
+    for (cell_index, cell_scores) in &scores.iter().sorted_by_key(|s| &s.cell_index).group_by(|s| &s.cell_index) {
         let mut matrix_row : Vec<usize> = vec![0; nrows];
         let mut parsed_scores : HashMap<&Umi, Vec<&Scores>> = HashMap::new();
         for score in cell_scores.into_iter() { 
@@ -563,6 +767,5 @@ pub fn map_and_count(bam : PathBuf, out_dir: &str, barcodes: &HashMap<Barcode, u
             }
         }
     }
-    
-    Ok((entries, nrows, metrics, rownames))
+    entries
 }
