@@ -11,6 +11,7 @@ pub const EM_REL_TH : f64 =  5e-4;
 pub const EM_ABS_TH : f64 = 5e-3;
 pub const EM_CARE_TH : f64 = 1e-5;
 pub const MIN_READS_CALL : usize = 100;
+pub const HOMOZYGOUS_TH : f64 = 0.15;
 
 pub const PROC_BC_SEQ_TAG: &[u8]  = b"CB";
 pub const PROC_UMI_SEQ_TAG: &[u8] = b"UB";

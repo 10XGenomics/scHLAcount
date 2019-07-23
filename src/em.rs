@@ -3,12 +3,13 @@ use failure::Error;
 use itertools::Itertools;
 
 use std::collections::{HashMap,HashSet};
+use std::cmp::max;
 use std::fs::File;
 use std::io::{Write,BufWriter};
 use std::path::{PathBuf};
 
 use crate::mapping::EqClassDb;
-use crate::config::{EM_ITERS,EM_REL_TH,EM_ABS_TH,EM_CARE_TH,MIN_READS_CALL,EqClass, PAIRS_TO_OUTPUT, WEIGHTS_TO_OUTPUT};
+use crate::config::{EM_ITERS,EM_REL_TH,EM_ABS_TH,EM_CARE_TH,MIN_READS_CALL,EqClass, PAIRS_TO_OUTPUT, WEIGHTS_TO_OUTPUT, HOMOZYGOUS_TH};
 
 #[derive(Default)]
 pub struct EqClassCounts {
@@ -130,6 +131,7 @@ impl EmProblem for EqClassCounts {
     }
 }
 
+#[allow(dead_code)]
 pub fn em(eq_classes: &EqClassCounts) -> Vec<f64> {
     let nitems = eq_classes.nitems;
 
@@ -336,14 +338,19 @@ fn diffs(t1: &[f64], t2: &[f64], rel_thresh: Option<f64>) -> (f64, f64) {
 pub fn em_wrapper(hla_index: PathBuf, hla_counts: PathBuf, cds_db: PathBuf, gen_db: PathBuf, outdir: &str) -> Result<(PathBuf,PathBuf), Error> {
     let index: pseudoaligner::Pseudoaligner<config::KmerType> = utils::read_obj(&hla_index)?;
     let mut eq_counts: EqClassDb = utils::read_obj(&hla_counts)?;
+    let mut alleles_called: HashSet<String> = HashSet::new();
+    
     let weights_name: PathBuf = [outdir, "weights.tsv"].iter().collect();
     let mut weights_file = BufWriter::new(File::create(weights_name)?);
+    writeln!(weights_file, "allele_name\tem_weight\treads_explained")?;
+    
     let pairs_name: PathBuf = [outdir, "pairs.tsv"].iter().collect();
     let mut pairs_file = BufWriter::new(File::create(pairs_name)?);
-    let mut alleles_called: HashSet<String> = HashSet::new();
+    writeln!(pairs_file, "allele_1\tallele_2\treads_explained")?;
     
     let (eq_class_counts, reads_explained) = eq_counts.eq_class_counts(index.tx_names.len());
     let weights = squarem(&eq_class_counts);
+    // (index, EM_weight, allele_name, num_reads_explained)
     let weight_names : Vec<(usize, f64, &String, usize)> = 
             weights.
             into_iter().
@@ -372,22 +379,29 @@ pub fn em_wrapper(hla_index: PathBuf, hla_counts: PathBuf, cds_db: PathBuf, gen_
         if weights_written == 0 {
             continue;
         }
-        let mut pairs : Vec<(&String,&String,f64)> = Vec::new();
+        // (allele1_name, allele2_name, frac_reads_explained_jointly, max_frac_reads_explained_single)
+        let mut pairs : Vec<(&String,&String,f64,f64)> = Vec::new();
         'outer: for i in 0..weights_written-1 {
             for j in i+1..weights_written {
                 let exp = eq_class_counts.pair_reads_explained(weights[i].0, weights[j].0);
                 if exp > MIN_READS_CALL as u32 {
-                    pairs.push((weights[i].2, weights[j].2, f64::from(exp) / f64::from(eq_class_counts.nreads)));
+                    pairs.push((weights[i].2, weights[j].2, f64::from(exp) / f64::from(eq_class_counts.nreads), f64::from(max(weights[i].4, weights[j].4) as u32) / f64::from(eq_class_counts.nreads)));
                 } else {break 'outer;}
             }
         }
         if !pairs.is_empty() {
-            pairs.sort_by(|(_,_,wa), (_,_,wb)| (-wa).partial_cmp(&-wb).unwrap());
+            pairs.sort_by(|(_,_,wa,_), (_,_,wb,_)| (-wa).partial_cmp(&-wb).unwrap());
             for p in pairs.iter().take(std::cmp::min(PAIRS_TO_OUTPUT,pairs.len())) {
                 writeln!(pairs_file, "{}\t{}\t{}",p.0, p.1, p.2 )?;
             }
-            alleles_called.insert(pairs[0].0.clone());
-            alleles_called.insert(pairs[0].1.clone());
+            // check for homozygous
+            if pairs[0].2 * HOMOZYGOUS_TH > pairs[0].2 - pairs[0].3 {
+                //println!("{} {}",pairs[0].2 * HOMOZYGOUS_TH,pairs[0].2 - pairs[0].3);
+                alleles_called.insert(pairs[0].0.clone());
+                alleles_called.insert(pairs[0].1.clone());
+            } else {
+                alleles_called.insert(weights[0].2.clone());
+            }
         } else if !weight_names.is_empty() {
             alleles_called.insert(weights[0].2.clone());
         }

@@ -23,7 +23,7 @@ use crate::config::{PROC_BC_SEQ_TAG,PROC_UMI_SEQ_TAG, Barcode, Umi, EqClass, MIN
                     MIN_SCORE_COUNT_PSEUDO, MIN_SCORE_COUNT_ALIGNMENT, 
                     GENE_CONSENSUS_THRESHOLD,ALLELE_CONSENSUS_THRESHOLD};
 
-const K: usize = 5;  // kmer match length
+const K: usize = 6;  // kmer match length
 const W: usize = 20;  // Window size for creating the band
 const MATCH: i32 = 1;  // Match score
 const MISMATCH: i32 = -1; // Mismatch score
@@ -63,6 +63,7 @@ impl UnmappedBamSeqReader  {
         UnmappedBamSeqReader {
             reader,
             tmp_record: Record::new(),
+            //TODO seek to the last header record to speed up iteration of unmapped
         }
     }
 }
@@ -239,10 +240,7 @@ impl Iterator for BamSeqReader {
             if self.tmp_record.is_secondary() || self.tmp_record.is_supplementary() { p = false; }
             
             // Get original read sequence from record.
-            let mut sequence = DnaString::from_acgt_bytes(&self.tmp_record.seq().as_bytes());
-//            if !self.tmp_record.is_reverse() {
-//                sequence = sequence.reverse(); //this does not complement, just reverses
-//            }
+            let sequence = DnaString::from_acgt_bytes(&self.tmp_record.seq().as_bytes());
 
             let barcode = match self.tmp_record.aux(PROC_BC_SEQ_TAG).map(|x| Barcode::from_slice(x.string())) {
                 Some(bc) => bc,
