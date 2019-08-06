@@ -402,7 +402,6 @@ mod tests {
                    "-g", "test/genomic_ABC.fa", 
                    "-f", "test/cds_ABC.fa",
                    "-c", "test/barcodes7.tsv",
-                   "--pl-tmp", tmp_dir.path().to_str().unwrap(),
                    "-o", result_dir,
                    "--pl-tmp", pl_dir ] {
             cmds.push(l.to_string());
