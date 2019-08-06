@@ -266,13 +266,12 @@ pub fn make_hla_index(hla_fasta: PathBuf, hla_index: PathBuf, allele_status: Pat
                         .from_path(allele_status)?;
     for result in rdr.records() {
         let record = result?;
-        let mut name: String = record[0].parse()?;
+        let name: String = record[0].parse()?;
         let conf: String = record[3].parse()?;
         let partial: String = record[6].parse()?;
         let dna: String = record[7].parse()?;
-        if let Some('N') = name.pop() { continue; } //don't use null alleles; we will never see them in RNA!
-        if conf == "Confirmed" && partial == "Full" && dna == "gDNA" {
-            let name: String = record[0].parse()?;
+        //don't use null alleles; we will never see them in RNA!
+        if name.rfind('N').is_none() && conf == "Confirmed" && partial == "Full" && dna == "gDNA" {
             allele_set.insert(name);
         }
     }
