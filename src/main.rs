@@ -355,7 +355,7 @@ mod tests {
     use sprs::io::read_matrix_market;
 
     #[test]
-    fn d_test_allele_fasta_debug_1min() {
+    fn test_allele_fasta() {
         //This test takes ~1min in compliation "debug" mode
         //21 alignments x 6 allele sequences
         let mut cmds = Vec::new();
@@ -371,8 +371,6 @@ mod tests {
                    "-g", "test/genomic_ABC.fa", 
                    "-f", "test/cds_ABC.fa",
                    "-c", "test/barcodes1.tsv",
-                   "-r", "6:29941260-29941360",
-                   "--pl-tmp", tmp_dir.path().to_str().unwrap(),
                    "-o", result_dir,
                    "--pl-tmp", pl_dir ] {
 
@@ -381,42 +379,12 @@ mod tests {
         let res = _main(cmds);
         assert!(!res.is_err());
         let seen_mat: TriMat<usize> = read_matrix_market(out_file).unwrap();
-        let expected_mat: TriMat<usize> = read_matrix_market("test/test_allele_fasta_debug.mtx").unwrap();
+        let expected_mat: TriMat<usize> = read_matrix_market("test/test_allele_fasta.mtx").unwrap();
         assert_eq!(seen_mat.to_csr(), expected_mat.to_csr());
     }
     
     #[test]
-    fn r_test_allele_fasta_release_2min() {
-        //This test takes ~2min in compilation "release" mode
-        //2864 alignments x 6 allele sequences
-        let mut cmds = Vec::new();
-        let tmp_dir = tempdir().unwrap();
-        let pl_dir = tmp_dir.path().join("p");
-        let pl_dir = pl_dir.to_str().unwrap();
-        let result_dir = tmp_dir.path().join("r");
-        let out_file = result_dir.join("count_matrix.mtx");
-        let out_file = out_file.to_str().unwrap();
-        let result_dir = result_dir.to_str().unwrap();
-        for l in &["scHLAcount", 
-                   "-b", "test/test.bam",
-                   "-g", "test/genomic_ABC.fa", 
-                   "-f", "test/cds_ABC.fa",
-                   "-c", "test/barcodes7.tsv",
-                   "-o", result_dir,
-                   "--pl-tmp", pl_dir ] {
-            cmds.push(l.to_string());
-        }
-        let res = _main(cmds);
-        assert!(!res.is_err());
-        let seen_mat: TriMat<usize> = read_matrix_market(out_file).unwrap();
-        let expected_mat: TriMat<usize> = read_matrix_market("test/test_allele_fasta_release.mtx").unwrap();
-        assert_eq!(seen_mat.to_csr(), expected_mat.to_csr());
-    }
-    
-    #[test]
-    fn r_test_call_release() {
-        //This test takes 30sec in compilation "release" mode
-        //2864 alignments x 2 allele sequences
+    fn test_call() {
         let mut cmds = Vec::new();
         let tmp_dir = tempdir().unwrap();
         let pl_dir = tmp_dir.path().join("p");
@@ -428,8 +396,8 @@ mod tests {
         for l in &["scHLAcount", 
                    "-b", "test/test.bam",
                    "-d", "test/fake_db",
-                   "-i", "test/hla_nuc.fasta.idx", 
-                   "-c", "test/barcodes7.tsv",
+                   "-i", "test/fake_db/hla_nuc.fasta.idx", 
+                   "-c", "test/barcodes0.tsv",
                    "-o", result_dir,
                    "--pl-tmp", pl_dir ] {
             cmds.push(l.to_string());
@@ -439,29 +407,5 @@ mod tests {
         let seen_mat: TriMat<usize> = read_matrix_market(out_file).unwrap();
         let expected_mat: TriMat<usize> = read_matrix_market("test/test_call.mtx").unwrap();
         assert_eq!(seen_mat.to_csr(), expected_mat.to_csr());
-        //TODO check pairs and weights files
-    }
-    
-    #[test]
-    fn b_test_call() {
-        let mut cmds = Vec::new();
-        let tmp_dir = tempdir().unwrap();
-        let pl_dir = tmp_dir.path().join("p");
-        let pl_dir = pl_dir.to_str().unwrap();
-        let result_dir = tmp_dir.path().join("r");
-        let out_file = result_dir.join("count_matrix.mtx");
-        let out_file = out_file.to_str().unwrap();
-        let result_dir = result_dir.to_str().unwrap();
-        for l in &["scHLAcount", 
-                   "-b", "test/test.bam",
-                   "-d", "/Users/charlotte.darby/bespin/arcasHLA/dat/IMGTHLA",
-                   "-i", "test/hla_nuc.fasta.idx", 
-                   "-c", "test/barcodes0.tsv",
-                   "-o", result_dir,
-                   "--pl-tmp", pl_dir ] {
-            cmds.push(l.to_string());
-        }
-        let res = _main(cmds);
-        assert!(!res.is_err());
     }
 }
