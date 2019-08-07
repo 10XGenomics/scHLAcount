@@ -78,7 +78,7 @@ fn get_args() -> clap::App<'static, 'static> {
     .arg(Arg::with_name("pseudoalignertmp")
          .long("pl-tmp")
          .value_name("PSEUDOALIGNER_TMP")
-         .default_value(".")
+         .default_value("pseudoaligner_tmp")
          .help("Directory to write the pseudoaligner temporary files generated"))
     // Input parameters (optional)
     .arg(Arg::with_name("fastagenomic")
