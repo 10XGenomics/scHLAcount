@@ -48,11 +48,11 @@ impl BamSeqReader {
 
     pub fn fetch(&mut self, locus: &Locus) {
         let tid = self.reader.header().tid(locus.chrom.as_bytes()).unwrap();
-        self.reader.fetch(tid, locus.start, locus.end);
+        self.reader.fetch(tid, locus.start, locus.end).unwrap();
     }
 
     pub fn fetch_str(&mut self, region: &[u8]) {
-        self.reader.fetch_str(&region);
+        self.reader.fetch_str(&region).unwrap();
     }
 }
 
@@ -176,7 +176,7 @@ impl<'a> EqClassDb {
         let mut total_reads = 0;
         let mut buf = Vec::new();
 
-        for ((_bc, _umi), mut hits) in &self.counts.iter().group_by(|c| (c.barcode_id, c.umi_id)) {
+        for ((_bc, _umi), hits) in &self.counts.iter().group_by(|c| (c.barcode_id, c.umi_id)) {
             buf.clear();
             let mut flag: bool = false;
             for c in hits {

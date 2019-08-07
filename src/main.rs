@@ -125,7 +125,7 @@ fn get_args() -> clap::App<'static, 'static> {
          .help("If specified, will use exact alignment to allele sequences to count moleucles (very slow!)"))
     .arg(Arg::with_name("unmapped")
          .long("unmapped")
-         .help("If specified, will also use unmapped reads for genotyping (very slow!)"))
+         .help("If specified, will also use unmapped reads for genotyping"))
 }
 
 fn main() {
