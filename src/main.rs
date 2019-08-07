@@ -19,28 +19,27 @@ extern crate sprs;
 extern crate tempfile;
 extern crate terminal_size;
 
-use clap::{Arg, App};
+use clap::{App, Arg};
 
 use failure::Error;
 use simplelog::*;
 use sprs::io::write_matrix_market;
 use sprs::TriMat;
-use terminal_size::{Width, terminal_size};
+use terminal_size::{terminal_size, Width};
 
 use std::collections::HashMap;
-use std::fs::{File,create_dir_all};
+use std::fs::{create_dir_all, File};
+use std::io::{BufRead, BufReader, BufWriter, Write};
+use std::path::{Path, PathBuf};
 use std::process;
-use std::path::{Path,PathBuf};
 use std::str::FromStr;
 use std::string::String;
-use std::io::{BufRead, BufReader, BufWriter, Write};
-
 
 mod mapping;
-use mapping::{mapping_wrapper, map_and_count_pseudo, map_and_count_sw};
+use mapping::{map_and_count_pseudo, map_and_count_sw, mapping_wrapper};
 
 mod em;
-use em::{em_wrapper};
+use em::em_wrapper;
 
 mod hla;
 use hla::make_hla_index;
@@ -129,9 +128,8 @@ fn get_args() -> clap::App<'static, 'static> {
          .help("If specified, will also use unmapped reads for genotyping (very slow!)"))
 }
 
-
 fn main() {
-    setup_panic!();  // pretty panics for users
+    setup_panic!(); // pretty panics for users
     let mut cli_args = Vec::new();
     for arg in std::env::args_os() {
         cli_args.push(arg.into_string().unwrap());
@@ -144,7 +142,7 @@ fn main() {
 }
 
 // constructing a _main allows for us to run regression tests way more easily
-#[allow(clippy::cognitive_complexity)] 
+#[allow(clippy::cognitive_complexity)]
 fn _main(cli_args: Vec<String>) -> Result<(), Error> {
     let args = get_args().get_matches_from(cli_args);
     let fasta_file_gen = args.value_of("fastagenomic").unwrap_or_default();
@@ -153,7 +151,9 @@ fn _main(cli_args: Vec<String>) -> Result<(), Error> {
     let pseudoaligner_tmpdir = args.value_of("pseudoalignertmp").unwrap_or_default();
     let hla_index = args.value_of("hlaindex").unwrap_or_default();
     let bam_file = args.value_of("bam").expect("You must provide a BAM file");
-    let cell_barcodes = args.value_of("cell_barcodes").expect("You must provide a cell barcodes file");
+    let cell_barcodes = args
+        .value_of("cell_barcodes")
+        .expect("You must provide a cell barcodes file");
     let region = args.value_of("region").unwrap_or_default();
     let out_dir = args.value_of("out_dir").unwrap_or_default();
     let primary_only = args.is_present("primary_alignments");
@@ -165,20 +165,25 @@ fn _main(cli_args: Vec<String>) -> Result<(), Error> {
         "info" => LevelFilter::Info,
         "debug" => LevelFilter::Debug,
         "error" => LevelFilter::Error,
-        &_ => { return Err(format_err!("Log level must be 'info', 'debug', or 'error'")); }
+        &_ => {
+            return Err(format_err!("Log level must be 'info', 'debug', or 'error'"));
+        }
     };
     let _ = SimpleLogger::init(ll, Config::default());
-    
+
     check_inputs_exist(bam_file, cell_barcodes, out_dir)?;
-    let region : Locus = Locus::from_str(region).expect("Failed to parse region string");   
-    let (mut genomic, mut cds) : (PathBuf,PathBuf) = (PathBuf::from(fasta_file_gen), PathBuf::from(fasta_file_cds));
+    let region: Locus = Locus::from_str(region).expect("Failed to parse region string");
+    let (mut genomic, mut cds): (PathBuf, PathBuf) =
+        (PathBuf::from(fasta_file_gen), PathBuf::from(fasta_file_cds));
     let bam_file = PathBuf::from(bam_file);
     // If the CDS or genomic FASTA files were not provided, generate them
     if fasta_file_gen.is_empty() || fasta_file_cds.is_empty() {
         check_inputs_exist_pseudoaligner(pseudoaligner_tmpdir)?;
-        let p_tmpdir : PathBuf = [pseudoaligner_tmpdir, "pseudoaligner"].iter().collect();
+        let p_tmpdir: PathBuf = [pseudoaligner_tmpdir, "pseudoaligner"].iter().collect();
         if hla_db_dir.is_empty() {
-            return Err(format_err!("Must provide either -d (database directory) or both -g and -f (FASTA sequences)."));
+            return Err(format_err!(
+                "Must provide either -d (database directory) or both -g and -f (FASTA sequences)."
+            ));
         }
         check_inputs_exist_hla_db(hla_db_dir)?;
         let (counts_file, hla_index1) : (PathBuf, PathBuf) =
@@ -194,8 +199,8 @@ fn _main(cli_args: Vec<String>) -> Result<(), Error> {
             (mapping_wrapper(PathBuf::from(hla_index), p_tmpdir, bam_file.clone(), Some(&region), use_unmapped).expect("Pseudoalignment mapping failed"), PathBuf::from(hla_index))
         };
 
-        let cdsdb : PathBuf = [hla_db_dir, "hla_nuc.fasta"].iter().collect();
-        let gendb : PathBuf = [hla_db_dir, "hla_gen.fasta"].iter().collect();
+        let cdsdb: PathBuf = [hla_db_dir, "hla_nuc.fasta"].iter().collect();
+        let gendb: PathBuf = [hla_db_dir, "hla_gen.fasta"].iter().collect();
         if let Ok(i) = em_wrapper(hla_index1, counts_file, cdsdb, gendb, pseudoaligner_tmpdir) {
             genomic = i.0;
             cds = i.1;
@@ -204,41 +209,78 @@ fn _main(cli_args: Vec<String>) -> Result<(), Error> {
         }
     }
     check_inputs_exist_fasta(&cds, &genomic)?;
-    
+
     let cell_barcodes = load_barcodes(&cell_barcodes).unwrap();
-    let (entries, nrows, metrics, rownames) = if exact_count { 
-            map_and_count_sw(bam_file, &out_dir, &cell_barcodes, &region, cds, genomic, primary_only)? 
-        } else {
-            map_and_count_pseudo(bam_file, &out_dir, &cell_barcodes, &region, cds, genomic, primary_only)?
-        };
-    
-    
-    info!("Initialized a {} features x {} cell barcodes matrix", nrows, cell_barcodes.len());
-    
-    let mut matrix : TriMat<usize> = TriMat::new((nrows, cell_barcodes.len()));
-    
-    info!("Number of alignments evaluated (with 'CB' and 'UB' tags): {}", metrics.num_reads);
-    if primary_only {
-        info!("Number of alignments skipped due to not being primary: {}", metrics.num_non_primary);
+    let (entries, nrows, metrics, rownames) = if exact_count {
+        map_and_count_sw(
+            bam_file,
+            &out_dir,
+            &cell_barcodes,
+            &region,
+            cds,
+            genomic,
+            primary_only,
+        )?
     } else {
-        info!("Number of alignments that were not primary: {}", metrics.num_non_primary);
+        map_and_count_pseudo(
+            bam_file,
+            &out_dir,
+            &cell_barcodes,
+            &region,
+            cds,
+            genomic,
+            primary_only,
+        )?
+    };
+
+    info!(
+        "Initialized a {} features x {} cell barcodes matrix",
+        nrows,
+        cell_barcodes.len()
+    );
+
+    let mut matrix: TriMat<usize> = TriMat::new((nrows, cell_barcodes.len()));
+
+    info!(
+        "Number of alignments evaluated (with 'CB' and 'UB' tags): {}",
+        metrics.num_reads
+    );
+    if primary_only {
+        info!(
+            "Number of alignments skipped due to not being primary: {}",
+            metrics.num_non_primary
+        );
+    } else {
+        info!(
+            "Number of alignments that were not primary: {}",
+            metrics.num_non_primary
+        );
     }
     info!("Number of alignments skipped due to not being associated with a cell barcode in the list provided: {}", metrics.num_not_cell_bc);
-    info!("Number of reads with no alignment score above threshold: {}", metrics.num_not_aligned);
-    info!("Number of alignments to CDS sequence: {}", metrics.num_cds_align);
-    info!("Number of alignments to genomic sequence: {}", metrics.num_gen_align);
-        
+    info!(
+        "Number of reads with no alignment score above threshold: {}",
+        metrics.num_not_aligned
+    );
+    info!(
+        "Number of alignments to CDS sequence: {}",
+        metrics.num_cds_align
+    );
+    info!(
+        "Number of alignments to genomic sequence: {}",
+        metrics.num_gen_align
+    );
+
     for e in entries {
         matrix.add_triplet(e.row as usize, e.column, e.value);
     }
-    
-    let d: PathBuf = [out_dir,"count_matrix.mtx"].iter().collect();
+
+    let d: PathBuf = [out_dir, "count_matrix.mtx"].iter().collect();
     write_matrix_market(d.to_str().unwrap(), &matrix)?;
     debug!("Wrote reference matrix file");
-    
-    let d: PathBuf = [out_dir,"summary.tsv"].iter().collect();
+
+    let d: PathBuf = [out_dir, "summary.tsv"].iter().collect();
     let mut summary_file = BufWriter::new(File::create(d).unwrap());
-    let m : sprs::CsMat<usize> = matrix.to_csr();
+    let m: sprs::CsMat<usize> = matrix.to_csr();
     for (row_ind, row_vec) in m.outer_iterator().enumerate() {
         let mut s = 0;
         for (_col_ind, &val) in row_vec.iter() {
@@ -246,15 +288,13 @@ fn _main(cli_args: Vec<String>) -> Result<(), Error> {
         }
         debug!("{} - {} molecules", rownames[row_ind], s);
         writeln!(summary_file, "{}\t{}", rownames[row_ind], s)?;
-
     }
     Ok(())
 }
 
 /* Validate Input/Output Files/Paths */
 
-pub fn check_inputs_exist(bam_file: &str, cell_barcodes: &str, out_dir: &str) 
-                          -> Result<(), Error> {
+pub fn check_inputs_exist(bam_file: &str, cell_barcodes: &str, out_dir: &str) -> Result<(), Error> {
     for path in [bam_file, cell_barcodes].iter() {
         if !Path::new(&path).exists() {
             return Err(format_err!("Input {:?} does not exist", path));
@@ -276,43 +316,68 @@ pub fn check_inputs_exist(bam_file: &str, cell_barcodes: &str, out_dir: &str)
             }
         }
         &_ => {
-            return Err(format_err!("BAM file did not end in .bam or .cram. Unable to validate"));
+            return Err(format_err!(
+                "BAM file did not end in .bam or .cram. Unable to validate"
+            ));
         }
     }
     if !Path::new(&out_dir).exists() {
         match create_dir_all(&out_dir) {
-            Err(_e) => { return Err(format_err!("Couldn't create results directory at {}", out_dir)); }
-            _ => { info!("Created output directory at {}", out_dir);}
+            Err(_e) => {
+                return Err(format_err!(
+                    "Couldn't create results directory at {}",
+                    out_dir
+                ));
+            }
+            _ => {
+                info!("Created output directory at {}", out_dir);
+            }
         }
-    } else { return Err(format_err!("Specified output directory {} already exists", out_dir)); }
+    } else {
+        return Err(format_err!(
+            "Specified output directory {} already exists",
+            out_dir
+        ));
+    }
     Ok(())
 }
 
 pub fn check_inputs_exist_pseudoaligner(path: &str) -> Result<(), Error> {
     if !Path::new(&path).exists() {
         match create_dir_all(&path) {
-            Err(_e) => { return Err(format_err!("Couldn't create temp directory at {}", path)); }
-            _ => { info!("Created temp directory at {}", path);}
+            Err(_e) => {
+                return Err(format_err!("Couldn't create temp directory at {}", path));
+            }
+            _ => {
+                info!("Created temp directory at {}", path);
+            }
         }
-    } else { return Err(format_err!("Specified tempdir {} already exists", path)); }
-    Ok(()) 
+    } else {
+        return Err(format_err!("Specified tempdir {} already exists", path));
+    }
+    Ok(())
 }
 
 pub fn check_inputs_exist_hla_db(path: &str) -> Result<(), Error> {
     if !Path::new(&path).exists() {
-        return Err(format_err!("IMGT-HLA database directory {} does not exist", path));
+        return Err(format_err!(
+            "IMGT-HLA database directory {} does not exist",
+            path
+        ));
     }
-    for file in [ "hla_gen.fasta", "hla_nuc.fasta", "Allele_status.txt" ].iter() {
-        let p : PathBuf = [path,file].iter().collect();
+    for file in ["hla_gen.fasta", "hla_nuc.fasta", "Allele_status.txt"].iter() {
+        let p: PathBuf = [path, file].iter().collect();
         if !p.exists() {
-            return Err(format_err!("IMGT-HLA database file {} does not exist", file));
+            return Err(format_err!(
+                "IMGT-HLA database file {} does not exist",
+                file
+            ));
         }
     }
     Ok(())
 }
-    
-pub fn check_inputs_exist_fasta(fasta_cds: &PathBuf, fasta_gen: &PathBuf)
-                                 -> Result<(), Error> {
+
+pub fn check_inputs_exist_fasta(fasta_cds: &PathBuf, fasta_gen: &PathBuf) -> Result<(), Error> {
     for path in [fasta_cds, fasta_gen].iter() {
         if !Path::new(path).exists() {
             return Err(format_err!("Input file {:?} does not exist", path));
@@ -323,7 +388,10 @@ pub fn check_inputs_exist_fasta(fasta_cds: &PathBuf, fasta_gen: &PathBuf)
 
 pub fn check_inputs_exist_hla_idx(path: &str) -> Result<(), Error> {
     if !Path::new(&path).exists() {
-        return Err(format_err!("Pseudoalignment index {} does not exist. Omit parameter -i to generate automatically.", path));
+        return Err(format_err!(
+            "Pseudoalignment index {} does not exist. Omit parameter -i to generate automatically.",
+            path
+        ));
     }
     Ok(())
 }
@@ -342,7 +410,9 @@ pub fn load_barcodes(filename: impl AsRef<Path>) -> Result<HashMap<Barcode, u32>
     }
     let num_bcs = bc_set.len();
     if num_bcs == 0 {
-        return Err(format_err!("Loaded 0 barcodes. Is your barcode file gzipped or empty?"));
+        return Err(format_err!(
+            "Loaded 0 barcodes. Is your barcode file gzipped or empty?"
+        ));
     }
     debug!("Loaded {} barcodes", num_bcs);
     Ok(bc_set)
@@ -351,8 +421,8 @@ pub fn load_barcodes(filename: impl AsRef<Path>) -> Result<HashMap<Barcode, u32>
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tempfile::tempdir;
     use sprs::io::read_matrix_market;
+    use tempfile::tempdir;
 
     #[test]
     fn test_allele_fasta() {
@@ -366,14 +436,21 @@ mod tests {
         let out_file = result_dir.join("count_matrix.mtx");
         let out_file = out_file.to_str().unwrap();
         let result_dir = result_dir.to_str().unwrap();
-        for l in &["scHLAcount", 
-                   "-b", "test/test.bam",
-                   "-g", "test/genomic_ABC.fa", 
-                   "-f", "test/cds_ABC.fa",
-                   "-c", "test/barcodes1.tsv",
-                   "-o", result_dir,
-                   "--pl-tmp", pl_dir ] {
-
+        for l in &[
+            "scHLAcount",
+            "-b",
+            "test/test.bam",
+            "-g",
+            "test/genomic_ABC.fa",
+            "-f",
+            "test/cds_ABC.fa",
+            "-c",
+            "test/barcodes1.tsv",
+            "-o",
+            result_dir,
+            "--pl-tmp",
+            pl_dir,
+        ] {
             cmds.push(l.to_string());
         }
         let res = _main(cmds);
@@ -382,7 +459,7 @@ mod tests {
         let expected_mat: TriMat<usize> = read_matrix_market("test/test_allele_fasta.mtx").unwrap();
         assert_eq!(seen_mat.to_csr(), expected_mat.to_csr());
     }
-    
+
     #[test]
     fn test_call() {
         let mut cmds = Vec::new();
@@ -393,13 +470,21 @@ mod tests {
         let out_file = result_dir.join("count_matrix.mtx");
         let out_file = out_file.to_str().unwrap();
         let result_dir = result_dir.to_str().unwrap();
-        for l in &["scHLAcount", 
-                   "-b", "test/test.bam",
-                   "-d", "test/fake_db",
-                   "-i", "test/fake_db/hla_nuc.fasta.idx", 
-                   "-c", "test/barcodes0.tsv",
-                   "-o", result_dir,
-                   "--pl-tmp", pl_dir ] {
+        for l in &[
+            "scHLAcount",
+            "-b",
+            "test/test.bam",
+            "-d",
+            "test/fake_db",
+            "-i",
+            "test/fake_db/hla_nuc.fasta.idx",
+            "-c",
+            "test/barcodes0.tsv",
+            "-o",
+            result_dir,
+            "--pl-tmp",
+            pl_dir,
+        ] {
             cmds.push(l.to_string());
         }
         let res = _main(cmds);

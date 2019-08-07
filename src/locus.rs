@@ -1,8 +1,8 @@
 // Copyright (c) 2017 10X Genomics, Inc. All rights reserved.
-use std::str::FromStr;
+use failure::Error;
 use regex::Regex;
 use std::fmt;
-use failure::Error;
+use std::str::FromStr;
 
 #[derive(PartialEq, Eq, Ord, PartialOrd, Hash, Debug, Deserialize, Clone)]
 pub struct Locus {
@@ -23,12 +23,10 @@ impl fmt::Display for Locus {
     }
 }
 
-
 fn remove_commas(s: &str) -> String {
     let ss = s.to_string();
     ss.replace(",", "")
 }
-
 
 impl FromStr for Locus {
     type Err = Error;
@@ -47,9 +45,9 @@ impl FromStr for Locus {
         let end_s = remove_commas(cap.get(4).unwrap().as_str());
 
         Ok(Locus {
-               chrom: cap.get(1).unwrap().as_str().to_string(),
-               start: FromStr::from_str(&start_s).unwrap(),
-               end: FromStr::from_str(&end_s).unwrap(),
-           })
+            chrom: cap.get(1).unwrap().as_str().to_string(),
+            start: FromStr::from_str(&start_s).unwrap(),
+            end: FromStr::from_str(&end_s).unwrap(),
+        })
     }
 }

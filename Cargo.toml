@@ -9,13 +9,12 @@ clap = "*"
 csv = "1"
 debruijn = { git = "https://github.com/10XGenomics/rust-debruijn"}
 debruijn_mapping = { git = "https://github.com/cdarby/rust-pseudoaligner" }
-docopt = "*"
 failure = "*"
 human-panic = "1.0.1"
 itertools = "*"
 log = "*"
 regex = "1"
-rust-htslib = "0.24"
+rust-htslib = { git = "https://github.com/ifiddes-10x/rust-htslib", branch="add_string_bam_fetch" }
 serde = "1.0"
 simplelog = "0.5.0"
 sprs = "*"
