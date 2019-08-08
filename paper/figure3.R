@@ -93,7 +93,7 @@ for (i in seq(1,length(feature.names$V1))) {
     curr_gene <- s[[1]][1]
   }
 }
-
+i <- i+1
 if (n_seen == 1 && curr_gene != "") {
   #one allele
   gene_names <- c(gene_names, curr_gene)

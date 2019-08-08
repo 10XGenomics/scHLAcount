@@ -76,6 +76,7 @@ for (i in seq(1,length(feature.names$V1))) {
     curr_gene <- s[[1]][1]
   }
 }
+i <- i+1
 if (n_seen == 1 && curr_gene != "") {
   #one allele
   gene_names <- c(gene_names, curr_gene)
@@ -93,7 +94,7 @@ if (n_seen == 1 && curr_gene != "") {
   cells <- AddMetaData(object=cells,col.name=paste0("gene",curr_gene,"ratio"),metadata=cells@meta.data[x]/(cells@meta.data[x]+cells@meta.data[y]))
 }
 
-CELLTYPE_PLOT <- DimPlot(object=cells,group.by='celltype', label=F, cells=rownames(cells@meta.data)[!is.na(cells$celltype)]) + ggtitle("(c) Cell types from Paulson et. al")
+CELLTYPE_PLOT <- DimPlot(object=cells,group.by='celltype', label=F, cells=rownames(cells@meta.data)[!is.na(cells$celltype)]) + ggtitle("(e) Cell types from Paulson et. al")
 
 # Bug in Seurat related to plotting, fails when a NA is first: https://github.com/satijalab/seurat/issues/1853
 # Temporary fix: reordering the rows so a NA doesn't come first
@@ -102,8 +103,13 @@ DRB1_ASE_PLOT <- FeaturePlot(cells, "geneDRB1ratio", reduction="tsne",cols=c('bl
 
 DRB1_EXPR_PLOT <- FeaturePlot(cells, "geneDRB1sum", reduction="tsne", cells = new.cell.order) + ggtitle("(a) HLA-DRB1 normalized expression")
 
-COMBINED <- grid.arrange(DRB1_EXPR_PLOT,DRB1_ASE_PLOT,CELLTYPE_PLOT,
-             layout_matrix=rbind(c(1,1,1,2,2,2),c(3,3,3,3,NA,NA)))
+C_ASE_PLOT <- FeaturePlot(cells, "geneCratio", reduction="tsne",cols=c('blue','red'), cells = new.cell.order) + ggtitle("(d) Fraction of molecules assigned to allele 07:02")
 
-ggsave("figure2.pdf", COMBINED, width=10, height=8, units="in")
+C_EXPR_PLOT <- FeaturePlot(cells, "geneCsum", reduction="tsne", cells = new.cell.order) + ggtitle("(c) HLA-C normalized expression")
+
+
+COMBINED <- grid.arrange(DRB1_EXPR_PLOT,DRB1_ASE_PLOT,C_EXPR_PLOT,C_ASE_PLOT,CELLTYPE_PLOT,
+             layout_matrix=rbind(c(1,1,1,2,2,2),c(3,3,3,4,4,4),c(5,5,5,5,NA,NA)))
+
+ggsave("figure2.pdf", COMBINED, width=10, height=12, units="in")
 
