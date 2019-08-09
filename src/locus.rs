@@ -11,12 +11,6 @@ pub struct Locus {
     pub end: u32,
 }
 
-impl Locus {
-    pub fn from_string(s: &str) -> Locus {
-        FromStr::from_str(s).ok().unwrap()
-    }
-}
-
 impl fmt::Display for Locus {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{}:{}-{}", self.chrom, self.start, self.end)
