@@ -34,7 +34,7 @@ Other Requirements: samtools
 
 1. Download the the IMGT/HLA database, available at [Github](https://github.com/ANHIG/IMGTHLA) or [FTP](ftp://ftp.ebi.ac.uk/pub/databases/ipd/imgt/hla/). You only need the `hla_gen.fasta` and `hla_nuc.fasta` files, but you can download the whole database if you choose.
 2. Use `samtools faidx` to index the `hla_gen.fasta` and `hla_nuc.fasta` files. 
-3. Create a file of the known genotypes, at most two per gene, with one genotype on each line. (Example TODO) 
+3. Create a file of the known genotypes, at most two per gene, with one genotype on each line. Follow the template at `paper/sample_gt.txt`. 
 4. We strongly recommend that if genotypes are unknown for any of the genes, you put the reference genome allele for those genes in the known genotypes file. Alleles represented in the GRCh38 primary assembly are listed below:
 ```
 A*03:01:01:01
