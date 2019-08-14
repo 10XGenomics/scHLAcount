@@ -9,7 +9,7 @@
 #==> hlac.bed <==
 #6	31268749	31272092
 
-# samtools view -b /mnt/yard2/ian/sra-data/paulson/SRR7692286/outs/possorted_genome_bam.bam 6 | bedtools coverage -split -a hlaa.bed -b stdin -d | cut -f5 > acov5p.txt
+# samtools view -b /mnt/yard2/ian/sra-data/paulson/SRR7692286/outs/possorted_genome_bam.bam 6:29942532-29945870 | bedtools coverage -split -a hlaa.bed -b stdin -d | cut -f5 > acov5p.txt
 # samtools view -b /mnt/yard2/ian/sra-data/paulson/SRR7692286/outs/possorted_genome_bam.bam 6:31353875-31357179 | bedtools coverage -split -a hlab.bed -b stdin -d | cut -f5 > bcov5p.txt
 # samtools view -b /mnt/yard2/ian/sra-data/paulson/SRR7692286/outs/possorted_genome_bam.bam 6:31268749-31272092 | bedtools coverage -split -a hlac.bed -b stdin -d | cut -f5 > ccov5p.txt
 

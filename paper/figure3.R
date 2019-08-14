@@ -82,9 +82,10 @@ for (i in seq(1,length(feature.names$V1))) {
       seurat <- AddMetaData(object=seurat,col.name=paste0("gene",curr_gene,"allele2"),metadata=mat[i-2,])
       
       seurat <- AddMetaData(object=seurat,col.name=paste0("gene",curr_gene,"sum"),metadata=log2(1 + c*seurat@meta.data[paste0("gene",curr_gene,"sum")]/seurat$nCount_RNA))
-      seurat <- AddMetaData(object=seurat,col.name=paste0("gene",curr_gene),metadata=log2(1 + c*seurat@meta.data[paste0("gene",curr_gene)]/seurat$nCount_RNA))
-      seurat <- AddMetaData(object=seurat,col.name=paste0("gene",curr_gene,"allele1"),metadata=log2(1 + c*seurat@meta.data[paste0("gene",curr_gene,"allele1")]/seurat$nCount_RNA))
-      seurat <- AddMetaData(object=seurat,col.name=paste0("gene",curr_gene,"allele2"),metadata=log2(1 + c*seurat@meta.data[paste0("gene",curr_gene,"allele2")]/seurat$nCount_RNA))
+      seurat <- AddMetaData(object=seurat,col.name=paste0("gene",curr_gene,"sumnolog"),metadata=c*seurat@meta.data[paste0("gene",curr_gene,"sum")]/seurat$nCount_RNA)
+      seurat <- AddMetaData(object=seurat,col.name=paste0("gene",curr_gene),metadata=c*seurat@meta.data[paste0("gene",curr_gene)]/seurat$nCount_RNA)
+      seurat <- AddMetaData(object=seurat,col.name=paste0("gene",curr_gene,"allele1"),metadata=c*seurat@meta.data[paste0("gene",curr_gene,"allele1")]/seurat$nCount_RNA)
+      seurat <- AddMetaData(object=seurat,col.name=paste0("gene",curr_gene,"allele2"),metadata=c*seurat@meta.data[paste0("gene",curr_gene,"allele2")]/seurat$nCount_RNA)
       x <- paste0("gene",curr_gene,"allele1")
       y <- paste0("gene",curr_gene,"allele2")
       seurat <- AddMetaData(object=seurat,col.name=paste0("gene",curr_gene,"ratio"),metadata=seurat@meta.data[x]/(seurat@meta.data[x]+seurat@meta.data[y]))
@@ -109,16 +110,14 @@ if (n_seen == 1 && curr_gene != "") {
   seurat <- AddMetaData(object=seurat,col.name=paste0("gene",curr_gene,"allele2"),metadata=mat[i-2,])
   
   seurat <- AddMetaData(object=seurat,col.name=paste0("gene",curr_gene,"sum"),metadata=log2(1 + c*seurat@meta.data[paste0("gene",curr_gene,"sum")]/seurat$nCount_RNA))
-  seurat <- AddMetaData(object=seurat,col.name=paste0("gene",curr_gene),metadata=log2(1 + c*seurat@meta.data[paste0("gene",curr_gene)]/seurat$nCount_RNA))
-  seurat <- AddMetaData(object=seurat,col.name=paste0("gene",curr_gene,"allele1"),metadata=log2(1 + c*seurat@meta.data[paste0("gene",curr_gene,"allele1")]/seurat$nCount_RNA))
-  seurat <- AddMetaData(object=seurat,col.name=paste0("gene",curr_gene,"allele2"),metadata=log2(1 + c*seurat@meta.data[paste0("gene",curr_gene,"allele2")]/seurat$nCount_RNA))
+  seurat <- AddMetaData(object=seurat,col.name=paste0("gene",curr_gene,"sumnolog"),metadata=c*seurat@meta.data[paste0("gene",curr_gene,"sum")]/seurat$nCount_RNA)
+  seurat <- AddMetaData(object=seurat,col.name=paste0("gene",curr_gene),metadata=c*seurat@meta.data[paste0("gene",curr_gene)]/seurat$nCount_RNA)
+  seurat <- AddMetaData(object=seurat,col.name=paste0("gene",curr_gene,"allele1"),metadata=c*seurat@meta.data[paste0("gene",curr_gene,"allele1")]/seurat$nCount_RNA)
+  seurat <- AddMetaData(object=seurat,col.name=paste0("gene",curr_gene,"allele2"),metadata=c*seurat@meta.data[paste0("gene",curr_gene,"allele2")]/seurat$nCount_RNA)
   x <- paste0("gene",curr_gene,"allele1")
   y <- paste0("gene",curr_gene,"allele2")
   seurat <- AddMetaData(object=seurat,col.name=paste0("gene",curr_gene,"ratio"),metadata=seurat@meta.data[x]/(seurat@meta.data[x]+seurat@meta.data[y]))
 }
-
-# Load completed analysis up to this point
-load("/mnt/park1/compbio/HLA/paulson_robj/paulson_val_seurat.Rdata")
 
 # Clusters determined by marker genes
 tumorClusters <- c(2,3,4,6,7,10,11)
@@ -127,6 +126,10 @@ normalCells <- !tumorCells
 
 cellTypes1 <- ifelse(tumorCells, 'Tumor', 'Non-Tumor')
 seurat <- AddMetaData(object = seurat, metadata = cellTypes1, col.name = 'cellTypes1')
+
+# Load completed analysis up to this point
+#save(seurat, file="/mnt/park1/compbio/HLA/paulson_robj/paulson_val_seurat.Rdata")
+load("/mnt/park1/compbio/HLA/paulson_robj/paulson_val_seurat.Rdata")
 
 # Plots
 
@@ -148,3 +151,52 @@ COMBINED <- grid.arrange(a_plt, b_plt, c_plt, d_plt, e_plt, f_plt,
                          layout_matrix=rbind(c(1,2),c(3,4),c(5,6)))
 ggsave("figure3.pdf", COMBINED, width=8.5, height=10, units="in")
 
+# Table 8
+n_tumor <- sum(seurat$cellTypes1 == "Tumor")
+mean(na.omit(seurat$geneAsumnolog[seurat$cellTypes1 == "Tumor"]))
+mean(na.omit(seurat$geneBsumnolog[seurat$cellTypes1 == "Tumor"]))
+mean(na.omit(seurat$geneCsumnolog[seurat$cellTypes1 == "Tumor"]))
+mean(na.omit(seurat$geneAratio[seurat$cellTypes1 == "Tumor"]))*100
+mean(na.omit(seurat$geneBratio[seurat$cellTypes1 == "Tumor"]))*100
+mean(na.omit(seurat$geneCratio[seurat$cellTypes1 == "Tumor"]))*100
+
+n_normal <- sum(seurat$cellTypes1 == "Non-Tumor")
+mean(na.omit(seurat$geneAsumnolog[seurat$cellTypes1 == "Non-Tumor"]))
+mean(na.omit(seurat$geneBsumnolog[seurat$cellTypes1 == "Non-Tumor"]))
+mean(na.omit(seurat$geneCsumnolog[seurat$cellTypes1 == "Non-Tumor"]))
+mean(na.omit(seurat$geneAratio[seurat$cellTypes1 == "Non-Tumor"]))*100
+mean(na.omit(seurat$geneBratio[seurat$cellTypes1 == "Non-Tumor"]))*100
+mean(na.omit(seurat$geneCratio[seurat$cellTypes1 == "Non-Tumor"]))*100
+
+
+# Table 7 (Discovery Subject)
+
+# Load completed analysis, same preprocessing steps as for Validation Subject
+# save(PBMC, file="/mnt/park1/compbio/HLA/paulson_robj/paulson_disc_pbmc.Rdata")
+# save(tumor, file="/mnt/park1/compbio/HLA/paulson_robj/paulson_disc_tumor.Rdata")
+load("/mnt/park1/compbio/HLA/paulson_robj/paulson_disc_tumor.Rdata")
+load("/mnt/park1/compbio/HLA/paulson_robj/paulson_disc_pbmc.Rdata")
+
+n_tumor <- sum(tumor$cellTypes1 == "Tumor")
+mean(na.omit(tumor$geneAsumnolog[tumor$cellTypes1 == "Tumor"]))
+mean(na.omit(tumor$geneBsumnolog[tumor$cellTypes1 == "Tumor"]))
+mean(na.omit(tumor$geneCsumnolog[tumor$cellTypes1 == "Tumor"]))
+mean(na.omit(tumor$geneAratio[tumor$cellTypes1 == "Tumor"]))*100
+mean(na.omit(tumor$geneBratio[tumor$cellTypes1 == "Tumor"]))*100
+mean(na.omit(tumor$geneCratio[tumor$cellTypes1 == "Tumor"]))*100
+
+n_normal <- sum(tumor$cellTypes1 == "Non-Tumor")
+mean(na.omit(tumor$geneAsumnolog[tumor$cellTypes1 == "Non-Tumor"]))
+mean(na.omit(tumor$geneBsumnolog[tumor$cellTypes1 == "Non-Tumor"]))
+mean(na.omit(tumor$geneCsumnolog[tumor$cellTypes1 == "Non-Tumor"]))
+mean(na.omit(tumor$geneAratio[tumor$cellTypes1 == "Non-Tumor"]))*100
+mean(na.omit(tumor$geneBratio[tumor$cellTypes1 == "Non-Tumor"]))*100
+mean(na.omit(tumor$geneCratio[tumor$cellTypes1 == "Non-Tumor"]))*100
+
+n_normal <- length(PBMC$TimePoints)
+mean(na.omit(PBMC$geneAsumnolog))
+mean(na.omit(PBMC$geneBsumnolog))
+mean(na.omit(PBMC$geneCsumnolog))
+mean(na.omit(PBMC$geneAratio))*100
+mean(na.omit(PBMC$geneBratio))*100
+mean(na.omit(PBMC$geneCratio))*100

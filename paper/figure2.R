@@ -65,9 +65,10 @@ for (i in seq(1,length(feature.names$V1))) {
       gene_names <- c(gene_names, curr_gene)
       has_two_alleles <- c(has_two_alleles, curr_gene)
       cells <- AddMetaData(object=cells,col.name=paste0("gene",curr_gene,"sum"),metadata=log2(1+c*(mat[i-1,]+mat[i-2,]+mat[i-3,])/cells$nCount_RNA))
-      cells <- AddMetaData(object=cells,col.name=paste0("gene",curr_gene),metadata=log2(1+c*mat[i-1,]/cells$nCount_RNA))
-      cells <- AddMetaData(object=cells,col.name=paste0("gene",curr_gene,"allele1"),metadata=log2(1+c*mat[i-3,]/cells$nCount_RNA))
-      cells <- AddMetaData(object=cells,col.name=paste0("gene",curr_gene,"allele2"),metadata=log2(1+c*mat[i-2,]/cells$nCount_RNA))
+      cells <- AddMetaData(object=cells,col.name=paste0("gene",curr_gene,"sumnolog"),metadata=c*(mat[i-1,]+mat[i-2,]+mat[i-3,])/cells$nCount_RNA)
+      cells <- AddMetaData(object=cells,col.name=paste0("gene",curr_gene),metadata=c*mat[i-1,]/cells$nCount_RNA)
+      cells <- AddMetaData(object=cells,col.name=paste0("gene",curr_gene,"allele1"),metadata=c*mat[i-3,]/cells$nCount_RNA)
+      cells <- AddMetaData(object=cells,col.name=paste0("gene",curr_gene,"allele2"),metadata=c*mat[i-2,]/cells$nCount_RNA)
       x <- paste0("gene",curr_gene,"allele1")
       y <- paste0("gene",curr_gene,"allele2")
       cells <- AddMetaData(object=cells,col.name=paste0("gene",curr_gene,"ratio"),metadata=cells@meta.data[x]/(cells@meta.data[x]+cells@meta.data[y]))
@@ -86,9 +87,10 @@ if (n_seen == 1 && curr_gene != "") {
   gene_names <- c(gene_names, curr_gene)
   has_two_alleles <- c(has_two_alleles, curr_gene)
   cells <- AddMetaData(object=cells,col.name=paste0("gene",curr_gene,"sum"),metadata=log2(1+c*(mat[i-1,]+mat[i-2,]+mat[i-3,])/cells$nCount_RNA))
-  cells <- AddMetaData(object=cells,col.name=paste0("gene",curr_gene),metadata=log2(1+c*mat[i-1,]/cells$nCount_RNA))
-  cells <- AddMetaData(object=cells,col.name=paste0("gene",curr_gene,"allele1"),metadata=log2(1+c*mat[i-3,]/cells$nCount_RNA))
-  cells <- AddMetaData(object=cells,col.name=paste0("gene",curr_gene,"allele2"),metadata=log2(1+c*mat[i-2,]/cells$nCount_RNA))
+  cells <- AddMetaData(object=cells,col.name=paste0("gene",curr_gene,"sumnolog"),metadata=c*(mat[i-1,]+mat[i-2,]+mat[i-3,])/cells$nCount_RNA)
+  cells <- AddMetaData(object=cells,col.name=paste0("gene",curr_gene),metadata=c*mat[i-1,]/cells$nCount_RNA)
+  cells <- AddMetaData(object=cells,col.name=paste0("gene",curr_gene,"allele1"),metadata=c*mat[i-3,]/cells$nCount_RNA)
+  cells <- AddMetaData(object=cells,col.name=paste0("gene",curr_gene,"allele2"),metadata=c*mat[i-2,]/cells$nCount_RNA)
   x <- paste0("gene",curr_gene,"allele1")
   y <- paste0("gene",curr_gene,"allele2")
   cells <- AddMetaData(object=cells,col.name=paste0("gene",curr_gene,"ratio"),metadata=cells@meta.data[x]/(cells@meta.data[x]+cells@meta.data[y]))
@@ -112,4 +114,29 @@ COMBINED <- grid.arrange(DRB1_EXPR_PLOT,DRB1_ASE_PLOT,C_EXPR_PLOT,C_ASE_PLOT,CEL
              layout_matrix=rbind(c(1,1,1,2,2,2),c(3,3,3,4,4,4),c(5,5,5,5,NA,NA)))
 
 ggsave("figure2.pdf", COMBINED, width=10, height=12, units="in")
+
+# Table 4 (HLA-DRB1)
+
+TYPES <- unique(celltypes.paper)
+ncells <- sapply(TYPES, function(ct) length(na.omit(cells@meta.data[paste0("gene","DRB1","sum")][cells$celltype == ct,1]))) # Number of cells
+a1 <- sapply(TYPES, function(ct) sum(na.omit(cells@meta.data[paste0("gene","DRB1","allele1")][cells$celltype == ct,1])))
+a2 <- sapply(TYPES, function(ct) sum(na.omit(cells@meta.data[paste0("gene","DRB1","allele2")][cells$celltype == ct,1])))
+s <- sapply(TYPES, function(ct) sum(na.omit(cells@meta.data[paste0("gene","DRB1","sum")][cells$celltype == ct,1])))
+s_nolog <- sapply(TYPES, function(ct) sum(na.omit(cells@meta.data[paste0("gene","DRB1","sumnolog")][cells$celltype == ct,1])))
+expr_DRB1 <- s/ncells # Normalized and log'd total expression
+expr_nolog_DRB1 <- s_nolog/ncells # Normalized and *not* log'd total expression
+ratio_DRB1 <- a1/(a1+a2) # Normalized but not log'd counts
+table4 <- cbind(ncells,ratio_DRB1,expr_nolog_DRB1)
+
+# Table 5 (HLA-C)
+
+a1 <- sapply(TYPES, function(ct) sum(na.omit(cells@meta.data[paste0("gene","C","allele1")][cells$celltype == ct,1])))
+a2 <- sapply(TYPES, function(ct) sum(na.omit(cells@meta.data[paste0("gene","C","allele2")][cells$celltype == ct,1])))
+s <- sapply(TYPES, function(ct) sum(na.omit(cells@meta.data[paste0("gene","C","sum")][cells$celltype == ct,1])))
+s_nolog <- sapply(TYPES, function(ct) sum(na.omit(cells@meta.data[paste0("gene","C","sumnolog")][cells$celltype == ct,1])))
+expr_C <- s/ncells # Normalized and log'd total expression
+expr_nolog_C <- s_nolog/ncells # Normalized and *not* log'd total expression
+ratio_C <- a1/(a1+a2) # Normalized but not log'd counts
+table5 <- cbind(ncells,ratio_C,expr_nolog_C)
+
 
