@@ -38,7 +38,7 @@ OPTIONS:
 
 ## Installation
 
-scHLAcount has automatically generated downloadable binaries for generic linux and Mac OSX under the [releases page](https://github.com/10XGenomics/vartrix/releases). The linux binaries are expected to work on [our supported Operating Systems](https://support.10xgenomics.com/os-support). 
+scHLAcount has automatically generated downloadable binaries for generic linux and Mac OSX under the [releases page](https://github.com/10XGenomics/scHLAcount/releases). The linux binaries are expected to work on [our supported Operating Systems](https://support.10xgenomics.com/os-support). 
 
 ## Compiling from source
 scHLAcount is a standard Rust executable project, that works with stable Rust >=1.13.
