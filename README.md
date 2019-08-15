@@ -43,7 +43,7 @@ scHLAcount has automatically generated downloadable binaries for generic linux a
 ## Compiling from source
 scHLAcount is a standard Rust executable project, that works with stable Rust >=1.13.
 
-If you need to compile from source, [install Rust](https://www.rust-lang.org/en-US/install.html), then type `cargo build --release` from within the directory containing the VarTrix source code. The executable will appear at `target/release/vartrix`. As usual it's important to use a release build to get good performance.
+If you need to compile from source, [install Rust](https://www.rust-lang.org/en-US/install.html), then type `cargo build --release` from within the directory containing the scHLAcount source code. The executable will appear at `target/release/sc_hla_count`. As usual it's important to use a release build to get good performance.
 
 ## Testing
 If you have compiled scHLAcount from source, you can run the tiny test dataset by typing the command `cargo test --release` from wthin the directory containing the scHLAcount source code.
