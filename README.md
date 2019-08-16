@@ -50,6 +50,12 @@ If you have compiled scHLAcount from source, you can run the tiny test dataset b
 
 The test data files in the `test/` folder also provide a simple example of the inputs and outputs for scHLAcount.
 
+## Support 
+
+scHLAcount is provided as an open-source tool for use by the community. Although we cannot provide full support for the software please submit a GitHub Issue if you have any problems, questions or comments. We would also be happy to consider Pull Requests that fix bugs or provide enhancements.
+
+Scripts in the `/paper` directory show how to reproduce results from our manuscript and are not supported.
+
 # Using scHLAcount
 
 ## Case 1: You have HLA genotypes for some or all class I / class II genes
