@@ -3,8 +3,7 @@
 ## Overview
 scHLAcount allows you to count molecules in single-cell RNA-seq data for class I genes HLA-A, B, and C; and class II genes DPA1, DPB1, DRA1, DRB1, DQA1, and DQB1 using a personalized reference genome. You can either use provided HLA types determined by alternative methods or call HLA types with this tool then quantify against those calls. See the [Using scHLAcount](#using-schlacount) section for more details.
 
-## Limitations
-While scHLAcount can determine HLA haplotypes given a HLA database like the one at IMGT, our testing has shown that alternative tools such as arcasHLA perform better at HLA genotyping. Therefore, we recommend that you use either alternative methods or arcasHLA to determine your genotypes before using scHLAcount to assign allele specific counts in your single cell RNA-seq dataset.
+![Workflow Figure](paper/workflow.pdf)
 
 ## Uses
 scHLAcount can be used to look at allele specific expression of HLA genes. It can also be used to evaluate loss of heterozygosity by overlaying cell-specific counts onto an expression based t-SNE projection and looking for clusters with complete loss of one haplotype. General loss of HLA expression can also be evaluated with scHLAcount, and performs better at this task than default Cell Ranger, particularly in the case where the sample has HLA haplotypes that are diverged from the reference.
@@ -35,6 +34,14 @@ OPTIONS:
         --pl-tmp <PSEUDOALIGNER_TMP>    Directory to write the pseudoaligner temporary files generated [default: .]
     -r, --region <STRING>               Samtools-format region string of reads to use [default: 6:28510120-33480577]
 ```  
+
+## Limitations
+
+While scHLAcount can determine HLA haplotypes given a HLA database like the one at IMGT, our testing has shown that alternative tools such as arcasHLA perform better at HLA genotyping. Therefore, we recommend that you use either alternative methods or arcasHLA to determine your genotypes before using scHLAcount to assign allele specific counts in your single cell RNA-seq dataset.
+
+We have determined that the best results for genotyping and allele-specific counting are found with 5' GEX data. There is a much stronger coverage bias towards the end of the transcript in 3' GEX data, which poses a problem for genotyping and molecule counting of class I genes because most of the variable sites between these three paralogs are contained in exons 2 and 3, which are at the 5' end of the transcript. The following figure shows the coverage profile for 5', 3'v2 and 3'v3 GEX assays, normalized to 0 and 1 for the minimum and maximum coverage seen in the region, respectively, for each assay.
+
+![GEX Coverage Figure](paper/coverage.pdf)
 
 ## Installation
 
