@@ -96,24 +96,28 @@ if (n_seen == 1 && curr_gene != "") {
   cells <- AddMetaData(object=cells,col.name=paste0("gene",curr_gene,"ratio"),metadata=cells@meta.data[x]/(cells@meta.data[x]+cells@meta.data[y]))
 }
 
-CELLTYPE_PLOT <- DimPlot(object=cells,group.by='celltype', label=F, cells=rownames(cells@meta.data)[!is.na(cells$celltype)]) + ggtitle("(e) Cell types from Paulson et. al")
+# Load completed analysis up to this point
+#save(cells, file="/mnt/park1/compbio/HLA/aml_seurat/AML3.Rdata")
+load("/mnt/park1/compbio/HLA/aml_seurat/AML3.Rdata")
+
+CELLTYPE_PLOT <- DimPlot(object=cells,group.by='celltype', label=F, cells=rownames(cells@meta.data)[!is.na(cells$celltype)]) + ggtitle("(e) Cell types from Petti et al.") + theme(axis.text.x=element_blank(),axis.ticks.x=element_blank(),axis.text.y=element_blank(),axis.ticks.y=element_blank(),axis.title=element_text(size=10))
 
 # Bug in Seurat related to plotting, fails when a NA is first: https://github.com/satijalab/seurat/issues/1853
 # Temporary fix: reordering the rows so a NA doesn't come first
 new.cell.order <- rownames(cells@meta.data)[order(cells@meta.data["geneDRB1ratio"])]
-DRB1_ASE_PLOT <- FeaturePlot(cells, "geneDRB1ratio", reduction="tsne",cols=c('blue','red'), cells = new.cell.order) + ggtitle("(b) Fraction of molecules assigned to allele 01:03")
+DRB1_ASE_PLOT <- FeaturePlot(cells, "geneDRB1ratio", reduction="tsne",cols=c('blue','red'), cells = new.cell.order) + ggtitle("(b) Fraction of molecules assigned to allele 01:03") + theme(axis.text.x=element_blank(),axis.ticks.x=element_blank(),axis.text.y=element_blank(),axis.ticks.y=element_blank(),axis.title=element_text(size=10))
 
-DRB1_EXPR_PLOT <- FeaturePlot(cells, "geneDRB1sum", reduction="tsne", cells = new.cell.order) + ggtitle("(a) HLA-DRB1 normalized expression")
+DRB1_EXPR_PLOT <- FeaturePlot(cells, "geneDRB1sum", reduction="tsne", cells = new.cell.order) + ggtitle("(a) HLA-DRB1 normalized expression") + theme(axis.text.x=element_blank(),axis.ticks.x=element_blank(),axis.text.y=element_blank(),axis.ticks.y=element_blank(),axis.title=element_text(size=10))
 
-C_ASE_PLOT <- FeaturePlot(cells, "geneCratio", reduction="tsne",cols=c('blue','red'), cells = new.cell.order) + ggtitle("(d) Fraction of molecules assigned to allele 07:02")
+C_ASE_PLOT <- FeaturePlot(cells, "geneCratio", reduction="tsne",cols=c('blue','red'), cells = new.cell.order) + ggtitle("(d) Fraction of molecules assigned to allele 07:02") + theme(axis.text.x=element_blank(),axis.ticks.x=element_blank(),axis.text.y=element_blank(),axis.ticks.y=element_blank(),axis.title=element_text(size=10))
 
-C_EXPR_PLOT <- FeaturePlot(cells, "geneCsum", reduction="tsne", cells = new.cell.order) + ggtitle("(c) HLA-C normalized expression")
-
+C_EXPR_PLOT <- FeaturePlot(cells, "geneCsum", reduction="tsne", cells = new.cell.order) + ggtitle("(c) HLA-C normalized expression") + theme(axis.text.x=element_blank(),axis.ticks.x=element_blank(),axis.text.y=element_blank(),axis.ticks.y=element_blank(),axis.title=element_text(size=10))
+ 
 
 COMBINED <- grid.arrange(DRB1_EXPR_PLOT,DRB1_ASE_PLOT,C_EXPR_PLOT,C_ASE_PLOT,CELLTYPE_PLOT,
              layout_matrix=rbind(c(1,1,1,2,2,2),c(3,3,3,4,4,4),c(5,5,5,5,NA,NA)))
 
-ggsave("figure2.pdf", COMBINED, width=10, height=12, units="in")
+ggsave("figure2-updated.pdf", COMBINED, width=10, height=12, units="in")
 
 # Table 4 (HLA-DRB1)
 

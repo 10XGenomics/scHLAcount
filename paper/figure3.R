@@ -1,14 +1,12 @@
-
-#TODO change file paths to their permanent home once Ian moves processed data to park1
-
 library(Matrix)
 library(Seurat)
 library(ggplot2)
+library(gridExtra)
 options(bitmapType='cairo')
 
 # Data processing commands for the expression matrix from Paulson Supplementary Data, updated to Seurat v3 syntax
 
-raw_data <- read.csv('/mnt/home/charlotte.darby/yard/paulson_data/GSE118056_raw.expMatrix.csv', header = TRUE, row.names = 1)
+raw_data <- read.csv('/mnt/park1/compbio/HLA/paulson_data/GSE118056_raw.expMatrix.csv', header = TRUE, row.names = 1)
 data <- log2(1 + sweep(raw_data, 2, median(colSums(raw_data))/colSums(raw_data), '*')) # Normalization
 cellTypes <- sapply(strsplit(colnames(data), ".", fixed=T), function(x) x[2])
 cellTypes <- ifelse(cellTypes == '1', 'PBMC', 'Tumor')
@@ -23,31 +21,31 @@ seurat <- FindNeighbors(seurat, dims = 1:10, k.param = 20, reduction="pca")
 seurat <- FindClusters(seurat, resolution = 0.6)
 
 # Read in scHLAcount matrixes
-mat1 <- readMM(file = paste0("/mnt/home/charlotte.darby/only-count-true-ref/paulson-7692286", "/count_matrix.mtx"))
-feature.names  <- read.delim(paste0("/mnt/home/charlotte.darby/only-count-true-ref/paulson-7692286","/labels.tsv"), header = FALSE, stringsAsFactors = FALSE)
-cell.names <- read.delim(gzfile(paste0("/mnt/yard2/ian/sra-data/paulson/SRR7692286", "/outs/filtered_feature_bc_matrix/","barcodes.tsv.gz")), header = FALSE, stringsAsFactors = FALSE)
+mat1 <- readMM(file = paste0("/mnt/park1/compbio/HLA/only-count-true-ref/paulson-7692286", "/count_matrix.mtx"))
+feature.names  <- read.delim(paste0("/mnt/park1/compbio/HLA/only-count-true-ref/paulson-7692286","/labels.tsv"), header = FALSE, stringsAsFactors = FALSE)
+cell.names <- read.delim(gzfile(paste0("/mnt/park1/compbio/HLA/paulson_data/cellranger_outs/SRR7692286", "/outs/filtered_feature_bc_matrix/","barcodes.tsv.gz")), header = FALSE, stringsAsFactors = FALSE)
 cell.names <- sapply(strsplit(cell.names$V1,"-",fixed=T), function(x) paste0(x[1], ".1"))
 dimnames(mat1)[[1]] <- feature.names$V1
 dimnames(mat1)[[2]] <- cell.names
 
-mat2 <- readMM(file = paste0("/mnt/home/charlotte.darby/only-count-true-ref/paulson-7692287", "/count_matrix.mtx"))
-feature.names  <- read.delim(paste0("/mnt/home/charlotte.darby/only-count-true-ref/paulson-7692287","/labels.tsv"), header = FALSE, stringsAsFactors = FALSE)
-cell.names <- read.delim(gzfile(paste0("/mnt/yard2/ian/sra-data/paulson/SRR7692287", "/outs/filtered_feature_bc_matrix/","barcodes.tsv.gz")), header = FALSE, stringsAsFactors = FALSE)
+mat2 <- readMM(file = paste0("/mnt/park1/compbio/HLA/only-count-true-ref/paulson-7692287", "/count_matrix.mtx"))
+feature.names  <- read.delim(paste0("/mnt/park1/compbio/HLA/only-count-true-ref/paulson-7692287","/labels.tsv"), header = FALSE, stringsAsFactors = FALSE)
+cell.names <- read.delim(gzfile(paste0("/mnt/park1/compbio/HLA/paulson_data/cellranger_outs/SRR7692287", "/outs/filtered_feature_bc_matrix/","barcodes.tsv.gz")), header = FALSE, stringsAsFactors = FALSE)
 cell.names <- sapply(strsplit(cell.names$V1,"-",fixed=T), function(x) paste0(x[1], ".1"))
 dimnames(mat2)[[1]] <- feature.names$V1
 dimnames(mat2)[[2]] <- cell.names
 
 # Tumor
-mat3 <- readMM(file = paste0("/mnt/home/charlotte.darby/only-count-true-ref/paulson-7692288", "/count_matrix.mtx"))
-feature.names  <- read.delim(paste0("/mnt/home/charlotte.darby/only-count-true-ref/paulson-7692288","/labels.tsv"), header = FALSE, stringsAsFactors = FALSE)
-cell.names <- read.delim(gzfile(paste0("/mnt/yard2/ian/sra-data/paulson/SRR7692288", "/outs/filtered_feature_bc_matrix/","barcodes.tsv.gz")), header = FALSE, stringsAsFactors = FALSE)
+mat3 <- readMM(file = paste0("/mnt/park1/compbio/HLA/only-count-true-ref/paulson-7692288", "/count_matrix.mtx"))
+feature.names  <- read.delim(paste0("/mnt/park1/compbio/HLA/only-count-true-ref/paulson-7692288","/labels.tsv"), header = FALSE, stringsAsFactors = FALSE)
+cell.names <- read.delim(gzfile(paste0("/mnt/park1/compbio/HLA/paulson_data/cellranger_outs/SRR7692288", "/outs/filtered_feature_bc_matrix/","barcodes.tsv.gz")), header = FALSE, stringsAsFactors = FALSE)
 cell.names <- sapply(strsplit(cell.names$V1,"-",fixed=T), function(x) paste0(x[1], ".2"))
 dimnames(mat3)[[1]] <- feature.names$V1
 dimnames(mat3)[[2]] <- cell.names
 
-mat4 <- readMM(file = paste0("/mnt/home/charlotte.darby/only-count-true-ref/paulson-7692289", "/count_matrix.mtx"))
-feature.names  <- read.delim(paste0("/mnt/home/charlotte.darby/only-count-true-ref/paulson-7692289","/labels.tsv"), header = FALSE, stringsAsFactors = FALSE)
-cell.names <- read.delim(gzfile(paste0("/mnt/yard2/ian/sra-data/paulson/SRR7692289", "/outs/filtered_feature_bc_matrix/","barcodes.tsv.gz")), header = FALSE, stringsAsFactors = FALSE)
+mat4 <- readMM(file = paste0("/mnt/park1/compbio/HLA/only-count-true-ref/paulson-7692289", "/count_matrix.mtx"))
+feature.names  <- read.delim(paste0("/mnt/park1/compbio/HLA/only-count-true-ref/paulson-7692289","/labels.tsv"), header = FALSE, stringsAsFactors = FALSE)
+cell.names <- read.delim(gzfile(paste0("/mnt/park1/compbio/HLA/paulson_data/cellranger_outs/SRR7692289", "/outs/filtered_feature_bc_matrix/","barcodes.tsv.gz")), header = FALSE, stringsAsFactors = FALSE)
 cell.names <- sapply(strsplit(cell.names$V1,"-",fixed=T), function(x) paste0(x[1], ".2"))
 dimnames(mat4)[[1]] <- feature.names$V1
 dimnames(mat4)[[2]] <- cell.names
@@ -150,6 +148,25 @@ f_plt <- FeaturePlot(seurat, paste0("gene","C", "ratio"), reduction="tsne", cols
 COMBINED <- grid.arrange(a_plt, b_plt, c_plt, d_plt, e_plt, f_plt,
                          layout_matrix=rbind(c(1,2),c(3,4),c(5,6)))
 ggsave("figure3.pdf", COMBINED, width=8.5, height=10, units="in")
+
+CELLTYPEPLOT <- TSNEPlot(seurat, group.by = 'cellTypes1') + ggtitle("(g) Cell types") + theme(plot.title = element_text(size=12)) + theme(axis.text.x=element_blank(),axis.ticks.x=element_blank(),axis.text.y=element_blank(),axis.ticks.y=element_blank(),axis.title=element_text(size=10))
+
+a_plt <- FeaturePlot(seurat, paste0("gene","A", "sum"), reduction="tsne") + ggtitle("(a) HLA-A") + theme(plot.title = element_text(size=12)) + theme(legend.position = "none") + theme(axis.text.x=element_blank(),axis.ticks.x=element_blank(),axis.text.y=element_blank(),axis.ticks.y=element_blank(),axis.title=element_text(size=10))
+b_plt <- FeaturePlot(seurat, paste0("gene","B", "sum"), reduction="tsne") + ggtitle("(b) HLA-B") + theme(plot.title = element_text(size=12)) + theme(legend.position = "none") + theme(axis.text.x=element_blank(),axis.ticks.x=element_blank(),axis.text.y=element_blank(),axis.ticks.y=element_blank(),axis.title=element_text(size=10))
+c_plt <- FeaturePlot(seurat, paste0("gene","C", "sum"), reduction="tsne") + ggtitle("(c) HLA-C") + theme(plot.title = element_text(size=12)) + theme(axis.text.x=element_blank(),axis.ticks.x=element_blank(),axis.text.y=element_blank(),axis.ticks.y=element_blank(),axis.title=element_text(size=10))
+
+# Bug in Seurat related to plotting, fails when a NA is first: https://github.com/satijalab/seurat/issues/1853
+# Temporary fix: reordering the rows so a NA doesn't come first
+new.cell.order <- rownames(seurat@meta.data)[order(seurat@meta.data[paste0("gene","A","ratio")])]
+d_plt <- FeaturePlot(seurat, paste0("gene","A", "ratio"), reduction="tsne", cols=c('blue','red'), cells=new.cell.order) + ggtitle("(d) Fraction molecules\nA*02:01") + theme(plot.title = element_text(size=12)) + theme(legend.position = "none") + theme(axis.text.x=element_blank(),axis.ticks.x=element_blank(),axis.text.y=element_blank(),axis.ticks.y=element_blank(),axis.title=element_text(size=10))
+e_plt <- FeaturePlot(seurat, paste0("gene","B", "ratio"), reduction="tsne", cols=c('blue','red')) + ggtitle("(e) Fraction molecules\nB*35:01") + theme(plot.title = element_text(size=12)) + theme(legend.position = "none") + theme(axis.text.x=element_blank(),axis.ticks.x=element_blank(),axis.text.y=element_blank(),axis.ticks.y=element_blank(),axis.title=element_text(size=10))
+f_plt <- FeaturePlot(seurat, paste0("gene","C", "ratio"), reduction="tsne", cols=c('blue','red')) + ggtitle("(f) Fraction molecules C1") + theme(plot.title = element_text(size=12)) + theme(axis.text.x=element_blank(),axis.ticks.x=element_blank(),axis.text.y=element_blank(),axis.ticks.y=element_blank(),axis.title=element_text(size=10))
+
+COMBINED <- grid.arrange(a_plt, b_plt, c_plt, d_plt, e_plt, f_plt, CELLTYPEPLOT,
+                         layout_matrix=rbind(c(1,1,1,2,2,2,3,3,3,3),c(4,4,4,5,5,5,6,6,6,6),c(7,7,7,7,7,NA,NA,NA,NA,NA)))
+ggsave("figure3-newlayout.pdf", COMBINED, width=8.5, height=8, units="in")
+
+
 
 # Table 8
 n_tumor <- sum(seurat$cellTypes1 == "Tumor")
