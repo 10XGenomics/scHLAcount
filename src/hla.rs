@@ -1,4 +1,4 @@
-// Copyright (c) 2018 10x Genomics, Inc. All rights reserved.
+// Copyright (c) 2019 10x Genomics, Inc. All rights reserved.
 
 use bio::io::fasta;
 use debruijn::dna_string::DnaString;
@@ -16,6 +16,10 @@ use std::path::PathBuf;
 use std::str::FromStr;
 use std::string::String;
 
+/// Represent an HLA allele. The gene and 1st field (`f1`) are required,
+/// additional fields are optional (`f2`, `f3`, `f4`). The expression character
+/// is currently dropped.
+/// See this reference for details: http://hla.alleles.org/nomenclature/naming.html
 #[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq, Ord, PartialOrd)]
 pub struct Allele {
     pub gene: Vec<u8>,
@@ -32,12 +36,15 @@ impl fmt::Display for Allele {
     }
 }
 
+/// Parser for HLA alleles.
 pub struct AlleleParser {
     valid_regex: Regex,
     field_regex: Regex,
 }
 
 impl AlleleParser {
+
+    /// Initialize an `AlleleParser`
     pub fn new() -> AlleleParser {
         let valid_regex = Regex::new("^[A-Z0-9]+[*][0-9]+(:[0-9]+)*[A-Z]?$").unwrap();
         let field_regex = Regex::new("[0-9]+(:[0-9]+)*").unwrap();
@@ -47,6 +54,8 @@ impl AlleleParser {
         }
     }
 
+    /// Parse an HLA allele string. The string must be a valid HLA allele as defined by
+    /// http://hla.alleles.org/nomenclature/naming.html
     pub fn parse(&self, s: &str) -> Result<Allele, Error> {
         if !self.valid_regex.is_match(s) {
             return Err(format_err!("invalid allele string: {}", s));
@@ -83,10 +92,13 @@ impl AlleleParser {
     }
 }
 
-// Parse headers of the form:
-// >HLA:HLA01534 A*02:53N 1098 bp
-// Get HLA allele sequences from:
-// ftp://ftp.ebi.ac.uk/pub/databases/ipd/imgt/hla/hla_nuc.fasta
+/// Load the HLA nucleotide sequence database, typically downloaded from:
+/// ftp://ftp.ebi.ac.uk/pub/databases/ipd/imgt/hla/hla_nuc.fasta
+/// This method select a single representative sequence for each 2-digit allele. The representative
+/// sequence is simply the longest sequence in the group of all entries with the same 2-digit allele.
+/// Only alleles from the main class-I and class-II genes are returned (A,B,C,DRB1,DPA1,DPB1,DQA1,DQB1)
+/// If `use_filter == True`, only alleles listed in `allele_set` will be returned. If `use_filter == False`, 
+/// the method returns only the longest sequence for each 2-digit allele.
 pub fn read_hla_cds(
     reader: fasta::Reader<impl Read>,
     allele_set: HashSet<String>,
@@ -196,115 +208,25 @@ pub fn read_hla_cds(
     Ok((seqs, tx_ids))
 }
 
+
+/// Same functionality as `read_hla_cds` but returns the allele sequences as byte arrays rather 
+/// than DnaStrings.
 pub fn read_hla_cds_string(
     reader: fasta::Reader<impl Read>,
     allele_set: HashSet<String>,
     use_filter: bool,
 ) -> Result<(Vec<Vec<u8>>, Vec<String>), Error> {
-    //TODO make these arguments or config variables
-    let genes = [
-        b"A".to_vec(),
-        b"B".to_vec(),
-        b"C".to_vec(),
-        b"DRB1".to_vec(),
-        b"DPA1".to_vec(),
-        b"DPB1".to_vec(),
-        b"DQA1".to_vec(),
-        b"DQB1".to_vec(),
-    ];
-    let mut seqs = Vec::new();
-    let mut transcript_counter = 0;
-    let mut tx_ids = Vec::new();
-    let allele_parser = AlleleParser::new();
 
-    info!("Starting reading the Fasta file");
-    let mut hlas = Vec::new();
-    for result in reader.records() {
-        let record = result?;
-
-        let dna_string = DnaString::from_acgt_bytes(record.seq());
-        let allele_str = record.desc().ok_or_else(|| format_err!("no HLA allele"))?;
-        let allele_str = allele_str
-            .split(' ')
-            .next()
-            .ok_or_else(|| format_err!("no HLA allele"))?;
-        if use_filter && !allele_set.contains(&allele_str.to_string()) {
-            continue;
-        }
-
-        let allele = allele_parser.parse(allele_str)?;
-        if genes.contains(&allele.gene) {
-            let tx_id = record.id().to_string();
-            let data = (allele, tx_id, allele_str.to_string(), dna_string);
-            hlas.push(data);
-        }
-    }
-
-    hlas.sort();
-
-    let mut lengths = HashMap::new();
-
-    // If we are not filtering using the external database, do this step
-    if !use_filter {
-        // All the alleles with a common 2-digit prefix must have the same length -- they can only differ by an synonymous mutation.
-        // Collate these lengths so that we can filter out non-full length sequences.
-        for (two_digit, alleles) in &hlas.iter().group_by(|v| (v.0.gene.clone(), v.0.f1, v.0.f2)) {
-            let mut ma: Vec<_> = alleles.collect();
-            //println!("td: {:?}, alleles: {:?}", two_digit, ma.len());
-
-            // Pick the longest representative
-            ma.sort_by_key(|v| v.3.len());
-            let longest = ma.pop().unwrap();
-            let (_, _, _, dna_string) = longest;
-
-            lengths.insert(two_digit.clone(), dna_string.len());
-        }
-    }
-
-    for (three_digit, alleles) in &hlas
-        .iter()
-        .group_by(|v| (v.0.gene.clone(), v.0.f1, v.0.f2, v.0.f3))
-    {
-        let mut ma: Vec<_> = alleles.collect();
-        //println!("td: {:?}, alleles: {:?}", three_digit, ma.len());
-
-        // Pick the longest representative
-        ma.sort_by_key(|v| v.3.len());
-
-        let longest = ma.pop().unwrap();
-        let (_, _, allele_str, dna_string) = longest;
-
-        // Get the length of longest 2-digit entry
-        if !use_filter {
-            let req_len = lengths[&(three_digit.0.clone(), three_digit.1, three_digit.2)];
-
-            let mylen = dna_string.len();
-
-            //println!("td: {:?}, alleles: {:?}, max_len: {}, req_len: {}", three_digit, nalleles, mylen, req_len);
-
-            if mylen >= req_len {
-                //TODO
-                //the CDS only has three-digit resolution so having more than that in allele_str is misleading
-                //when that's reported as the HLA type
-                seqs.push(dna_string.clone().to_ascii_vec());
-                tx_ids.push(allele_str.to_string());
-                transcript_counter += 1;
-            }
-        } else {
-            seqs.push(dna_string.clone().to_ascii_vec());
-            tx_ids.push(allele_str.to_string());
-            transcript_counter += 1;
-        }
-    }
-
-    info!(
-        "Read {} Alleles, deduped into {} full-length 3-digit alleles",
-        hlas.len(),
-        transcript_counter
-    );
-    Ok((seqs, tx_ids))
+    let (dna_strings, tx_ids) = read_hla_cds(reader, allele_set, use_filter)?;
+    let byte_strings = dna_strings.into_iter().map(|s| s.to_ascii_vec()).collect();
+    Ok((byte_strings, tx_ids))
 }
 
+
+/// Create a DeBruijn graph index of the HLA alleles listed in the CSV `allele_status` 
+/// using allele sequences loaded from the FASTA files `hla_fasta`, and write the index
+/// to `hla_index`.  The index is in an opaque serde/bincode format & can generally only be
+/// read by the same build of scHLAcount that produced it. 
 pub fn make_hla_index(
     hla_fasta: PathBuf,
     hla_index: PathBuf,

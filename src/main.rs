@@ -1,3 +1,5 @@
+// Copyright (c) 2019 10x Genomics, Inc. All rights reserved.
+
 extern crate bio;
 extern crate clap;
 extern crate debruijn;

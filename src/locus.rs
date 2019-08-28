@@ -1,4 +1,5 @@
-// Copyright (c) 2017 10X Genomics, Inc. All rights reserved.
+// Copyright (c) 2019 10x Genomics, Inc. All rights reserved.
+
 use failure::Error;
 use regex::Regex;
 use std::fmt;
