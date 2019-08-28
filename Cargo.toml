@@ -1,20 +1,23 @@
 [package]
 name = "sc_hla_count"
-version = "0.0.0"
-authors = ["Charlotte Darby <cdarby@jhu.edu>", "Ian Fiddes <ian.fiddes@10xgenomics.com>", "Patrick Marks <patrick@10xgenomics.com>"]
+version = "0.1.0"
+authors = ["Charlotte Darby <cdarby@jhu.edu>", "Ian Fiddes <ian.t.fiddes@gmail.com>", "Patrick Marks <patrick@10xgenomics.com>"]
 
 [dependencies]
 bio = "0.25"
 clap = "*"
 csv = "1"
-debruijn = { git = "https://github.com/10XGenomics/rust-debruijn"}
-debruijn_mapping = { git = "https://github.com/cdarby/rust-pseudoaligner" }
+debruijn = { git = "https://github.com/10XGenomics/rust-debruijn" }
+debruijn_mapping = { git = "https://github.com/10XGenomics/rust-pseudoaligner.git", rev = "ae4aadbce921d3233e3bd9b3ee8a8466804b20ad" }
 failure = "*"
 human-panic = "1.0.1"
-itertools = "*"
+itertools = "0.8"
 log = "*"
 regex = "1"
-rust-htslib = { git = "https://github.com/ifiddes-10x/rust-htslib", branch="add_string_bam_fetch" }
+
+# todo: switch back to crates.io version after next release of rust-htslib
+rust-htslib = { git = "https://github.com/rust-bio/rust-htslib.git", rev="18072e0faf909ed19da4d1226a35c239a4b4292e" }
+
 serde = "1.0"
 simplelog = "0.5.0"
 sprs = "*"

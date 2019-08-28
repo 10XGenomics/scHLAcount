@@ -1,3 +1,5 @@
+// Copyright (c) 2019 10x Genomics, Inc. All rights reserved.
+
 use debruijn_mapping::{config, pseudoaligner, utils};
 use failure::Error;
 use itertools::Itertools;

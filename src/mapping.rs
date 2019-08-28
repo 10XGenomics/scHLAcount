@@ -1,3 +1,5 @@
+// Copyright (c) 2019 10x Genomics, Inc. All rights reserved.
+
 use bio::alignment::pairwise::banded::Aligner;
 use bio::alignment::pairwise::Scoring;
 use bio::alignment::sparse::*;
