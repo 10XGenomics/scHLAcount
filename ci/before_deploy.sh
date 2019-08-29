@@ -29,8 +29,8 @@ mk_tarball() {
     local cargo_out_dir="$(cargo_out_dir "target/$TARGET")"
 
     # Copy the scHLAcount binary and strip it.
-    cp "target/$TARGET/release/scHLAcount" "$staging/scHLAcount"
-    #"${gcc_prefix}strip" "$staging/scHLAcount"
+    cp "target/$TARGET/release/sc_hla_count" "$staging/sc_hla_count"
+    #"${gcc_prefix}strip" "$staging/sc_hla_count"
     # Copy the licenses and README.
     cp {README.md,LICENSE} "$staging/"
 
