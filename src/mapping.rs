@@ -18,6 +18,8 @@ use std::collections::{HashMap, HashSet};
 use std::fs::File;
 use std::io::{BufWriter, Write};
 use std::path::PathBuf;
+use serde::{Serialize, Deserialize};
+use log::{debug, info};
 
 use crate::config::{
     Barcode, EqClass, Umi, ALLELE_CONSENSUS_THRESHOLD, GENE_CONSENSUS_THRESHOLD, MIN_SCORE_CALL,

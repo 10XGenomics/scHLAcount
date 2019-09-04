@@ -1,29 +1,7 @@
 // Copyright (c) 2019 10x Genomics, Inc. All rights reserved.
-
-extern crate bio;
-extern crate clap;
-extern crate debruijn;
-extern crate debruijn_mapping;
-#[macro_use]
-extern crate failure;
-#[macro_use]
-extern crate human_panic;
-extern crate itertools;
-#[macro_use]
-extern crate log;
-extern crate regex;
-extern crate rust_htslib;
-#[macro_use]
-extern crate serde;
-extern crate simplelog;
-extern crate smallvec;
-extern crate sprs;
-extern crate tempfile;
-extern crate terminal_size;
-
 use clap::{App, Arg};
 
-use failure::Error;
+use failure::{Error, format_err};
 use simplelog::*;
 use sprs::io::write_matrix_market;
 use sprs::TriMat;
@@ -36,6 +14,9 @@ use std::path::{Path, PathBuf};
 use std::process;
 use std::str::FromStr;
 use std::string::String;
+
+use log::{debug, info};
+use human_panic::setup_panic;
 
 mod mapping;
 use mapping::{map_and_count_pseudo, map_and_count_sw, mapping_wrapper};

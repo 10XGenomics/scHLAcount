@@ -4,10 +4,11 @@ use bio::io::fasta;
 use debruijn::dna_string::DnaString;
 use debruijn_mapping::build_index::build_index;
 use debruijn_mapping::config::KmerType;
-use failure::Error;
+use failure::{Error, format_err};
 use itertools::Itertools;
 use regex::Regex;
-use serde::Serialize;
+use serde::{Serialize, Deserialize};
+use log::info;
 
 use std::collections::{HashMap, HashSet};
 use std::fmt;
