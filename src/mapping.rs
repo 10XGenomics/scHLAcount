@@ -1,5 +1,6 @@
 // Copyright (c) 2019 10x Genomics, Inc. All rights reserved.
 
+use itertools::cloned;
 use bio::alignment::pairwise::banded::Aligner;
 use bio::alignment::pairwise::Scoring;
 use bio::alignment::sparse::*;
@@ -458,7 +459,7 @@ pub fn map_and_count_sw(
     let d: PathBuf = [out_dir, "labels.tsv"].iter().collect();
     let mut labels_file = BufWriter::new(File::create(d).unwrap());
     let mut eq_class_to_gene: HashMap<Vec<u32>, (Vec<u8>, usize)> = HashMap::new();
-    let mut genes_to_rownums: HashMap<Vec<u8>, usize> = HashMap::new();
+    let mut genes_to_rownums: HashMap<Vec<u8>, (usize,usize)> = HashMap::new();
     let mut nrows: usize = 0;
     let mut rownames: Vec<String> = Vec::new();
     for (g, mut a_group) in &alleles_cds
@@ -466,7 +467,6 @@ pub fn map_and_count_sw(
         .sorted_by_key(|a| &a.0.gene)
         .group_by(|a| &a.0.gene)
     {
-        genes_to_rownums.insert(g.clone(), nrows);
         let a1 = a_group.next().unwrap();
         eq_class_to_gene.insert(vec![a1.1], (g.clone(), 0));
         if let Some(a2) = a_group.next() {
@@ -495,6 +495,7 @@ pub fn map_and_count_sw(
             rownames.push(String::from_utf8(a1.0.name.clone()).unwrap());
             rownames.push(String::from_utf8(a2.0.name.clone()).unwrap());
             rownames.push(String::from_utf8(g.clone().to_vec()).unwrap());
+    		genes_to_rownums.insert(g.clone(), (nrows-3,2));
         } else {
             // only one allele : one row
             nrows += 1;
@@ -504,6 +505,7 @@ pub fn map_and_count_sw(
                 String::from_utf8(a1.0.name.clone()).unwrap()
             )?;
             rownames.push(String::from_utf8(a1.0.name.clone()).unwrap());
+	        genes_to_rownums.insert(g.clone(), (nrows-1,1));
         }
     }
     labels_file.flush()?;
@@ -672,7 +674,7 @@ pub fn map_and_count_pseudo(
     let d: PathBuf = [out_dir, "labels.tsv"].iter().collect();
     let mut labels_file = BufWriter::new(File::create(d).unwrap());
     let mut eq_class_to_gene: HashMap<Vec<u32>, (Vec<u8>, usize)> = HashMap::new();
-    let mut genes_to_rownums: HashMap<Vec<u8>, usize> = HashMap::new();
+    let mut genes_to_rownums: HashMap<Vec<u8>, (usize,usize)> = HashMap::new();
     let mut nrows: usize = 0;
     let mut rownames: Vec<String> = Vec::new();
     for (g, mut a_group) in &alleles
@@ -680,45 +682,53 @@ pub fn map_and_count_pseudo(
         .sorted_by_key(|a| &a.0.gene)
         .group_by(|a| &a.0.gene)
     {
-        genes_to_rownums.insert(g.clone(), nrows);
+		//first allele
         let a1 = a_group.next().unwrap();
         eq_class_to_gene.insert(vec![a1.1], (g.clone(), 0));
-        if let Some(a2) = a_group.next() {
-            //two alleles : three rows
-            eq_class_to_gene.insert(vec![a2.1], (g.clone(), 1));
-            let mut x = vec![a1.1, a2.1];
-            x.sort();
-            eq_class_to_gene.insert(x.to_owned(), (g.clone(), 2));
-            nrows += 3;
-
-            writeln!(
-                labels_file,
-                "{}",
-                String::from_utf8(a1.0.name.clone()).unwrap()
-            )?;
+		nrows += 1; // row for allele 1
+		writeln!(
+            labels_file,
+            "{}",
+            String::from_utf8(a1.0.name.clone()).unwrap()
+        )?;
+        rownames.push(String::from_utf8(a1.0.name.clone()).unwrap());
+		let mut at_least_two_alleles : bool = false;
+		let mut rownum = 1;
+		let mut v : Vec<u32> = vec![a1.1];
+        while let Some(a2) = a_group.next() { // two or more alleles
+			at_least_two_alleles = true;      
+			eq_class_to_gene.insert(vec![a2.1], (g.clone(), rownum));
+			rownames.push(String::from_utf8(a2.0.name.clone()).unwrap());
+			nrows += 1;
             writeln!(
                 labels_file,
                 "{}",
                 String::from_utf8(a2.0.name.clone()).unwrap()
             )?;
-            writeln!(
+			rownum += 1;
+			v.push(a2.1);
+		}
+		if at_least_two_alleles {           
+			// gene (not specific allele)
+			nrows += 1;
+            rownames.push(String::from_utf8(g.clone().to_vec()).unwrap());
+			writeln!(
                 labels_file,
                 "{}",
                 String::from_utf8(g.clone().to_vec()).unwrap()
             )?;
-            rownames.push(String::from_utf8(a1.0.name.clone()).unwrap());
-            rownames.push(String::from_utf8(a2.0.name.clone()).unwrap());
-            rownames.push(String::from_utf8(g.clone().to_vec()).unwrap());
+			// set of all alleles
+			eq_class_to_gene.insert(v.clone(), (g.clone(), rownum));
+			// all combinations of two or more alleles from v
+			for n_alleles in 2..v.len() {
+				for c in v.iter().combinations(n_alleles) {
+					eq_class_to_gene.insert(itertools::cloned(c).collect(), (g.clone(), rownum));
+				}
+			}
+			genes_to_rownums.insert(g.clone(), (nrows-rownum-1,rownum)); // (index of first row, number of alleles)
         } else {
-            // only one allele : one row
-            nrows += 1;
-            writeln!(
-                labels_file,
-                "{}",
-                String::from_utf8(a1.0.name.clone()).unwrap()
-            )?;
-            rownames.push(String::from_utf8(a1.0.name.clone()).unwrap());
-        }
+			genes_to_rownums.insert(g.clone(), (nrows-1,1)); // (index of first row, number of alleles)
+		}
     }
     labels_file.flush()?;
 
@@ -817,7 +827,7 @@ pub fn map_and_count_pseudo(
 
 pub fn count(
     scores: &[Scores],
-    genes_to_rownums: HashMap<Vec<u8>, usize>,
+    genes_to_rownums: HashMap<Vec<u8>,(usize,usize)>,
     nrows: usize,
 ) -> Vec<MatrixEntry> {
     let mut entries: Vec<MatrixEntry> = Vec::new();
@@ -836,57 +846,45 @@ pub fn count(
         }
         for (_umi, all_scores) in parsed_scores.into_iter() {
             let mut nreads: f64 = 0.0;
-            let mut gene_frq: HashMap<Vec<u8>, (usize, usize, usize)> = HashMap::new();
+            let mut gene_frq: HashMap<Vec<u8>, Vec<u8>> = HashMap::new();
             for score in all_scores.into_iter() {
-                match score.max_allele {
-                    0 => {
-                        gene_frq
-                            .entry(score.max_gene.clone())
-                            .or_insert((0, 0, 0))
-                            .0 += 1
-                    } //allele 1
-                    1 => {
-                        gene_frq
-                            .entry(score.max_gene.clone())
-                            .or_insert((0, 0, 0))
-                            .1 += 1
-                    } //allele 2
-                    2 => {
-                        gene_frq
-                            .entry(score.max_gene.clone())
-                            .or_insert((0, 0, 0))
-                            .2 += 1
-                    } //gene
-                    _ => (),
-                };
+				let nalleles = genes_to_rownums[&score.max_gene].1;
+                gene_frq.entry(score.max_gene.clone()).or_insert(vec![0;nalleles+1])[score.max_allele] += 1;
                 nreads += 1.0;
             }
+			println!("{:?}",gene_frq);
             let mut max_gene_this_umi: Vec<u8> = Vec::new();
-            let mut max_allele_this_umi: usize = 0;
+            let mut allele_offset: usize = 0;
             let mut max_reads_this_umi: usize = 0;
-            for (g, frq) in gene_frq.into_iter() {
-                let nreads_g = frq.0 + frq.1 + frq.2;
+            for (g, frq) in gene_frq.into_iter() { // look at reads for each gene
+				let nalleles = genes_to_rownums[&g].1;
+                let nreads_g : usize = frq.iter().sum::<u8>() as usize;
+				println!("{:?}",frq);
+				println!("{} {}",nreads, nreads_g);
                 if nreads_g > max_reads_this_umi
                     && nreads_g as f64 > GENE_CONSENSUS_THRESHOLD * nreads
-                {
+                { // if this gene has the most reads so far and has more than GENE_CONSENSUS_THRESHOLD fraction of total reads
                     max_gene_this_umi = g;
                     max_reads_this_umi = nreads_g;
-                    if (frq.0 as f64 > ALLELE_CONSENSUS_THRESHOLD * nreads)
-                        && (ALLELE_CONSENSUS_THRESHOLD * nreads > frq.1 as f64)
-                    {
-                        max_allele_this_umi = 0; //allele 1
-                    } else if (frq.1 as f64 > ALLELE_CONSENSUS_THRESHOLD * nreads)
-                        && (ALLELE_CONSENSUS_THRESHOLD * nreads > frq.0 as f64)
-                    {
-                        max_allele_this_umi = 1; //allele 2
-                    } else {
-                        max_allele_this_umi = 2; //gene
-                    }
+					allele_offset = nalleles; // assign to gene if none of the alleles pass the condition in the following loop
+					if nalleles > 1 { 
+						for (allele_num, read_count) in frq.iter().enumerate() {
+							println!("{:?}", (nreads_g as f64 - frq[nalleles] as f64 - *read_count as f64));
+							if (nalleles > allele_num) && // skip the last entry (corresponding to gene)
+							(*read_count as f64 > ALLELE_CONSENSUS_THRESHOLD * nreads_g as f64) &&
+							(ALLELE_CONSENSUS_THRESHOLD * nreads_g as f64 > (nreads_g as f64 - frq[nalleles] as f64 - *read_count as f64) ) { 
+								allele_offset = allele_num;
+							}	
+						}
+					} else {
+						allele_offset = 0; // offset is 0 if only one allele
+					}		 
                 }
+			println!("{}",allele_offset);
             }
             if !max_gene_this_umi.is_empty() {
                 matrix_row
-                    [max_allele_this_umi + genes_to_rownums.get(&max_gene_this_umi).unwrap()] += 1;
+                    [allele_offset + genes_to_rownums.get(&max_gene_this_umi).unwrap().0] += 1;
             }
         }
         for (c, val) in matrix_row.iter().enumerate() {
