@@ -88,6 +88,13 @@ DPB1*04:01:01:01
 6. Run `prepare_reference.sh known_genotypes.txt` to get your custom references `cds.fasta` and `gen.fasta`. The samtools command will fail if the coding and genomic sequence of all alleles specified are not present in the database! If multiple alleles are present that match the provided level of specificity of the genotype, one will be chosen arbitrarily.
 7. Run scHLAcount with the custom references as `-f` and `-g` parameters. Do not use the `-i` and `-d` parameters.
 
+### Case 1b: The sample contains cells from more than one individual, and you have HLA genotypes for some or all class I / class II genes 
+
+Follow the instructions in Case 1, with the following change:
+
+3. Create a combined file of the known genotypes for all individuals, with one genotype on each line. Follow the template at `paper/sample_gt.txt`. If any individuals have an identical genotype at two-digit resolution, include the genotype only once. 
+
+Note: the `--use-exact-count` parameter cannot be used with more than two genotypes per allele.
 
 ## Case 2: You do not have HLA genotypes
 

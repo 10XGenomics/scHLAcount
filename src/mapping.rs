@@ -1,6 +1,5 @@
 // Copyright (c) 2019 10x Genomics, Inc. All rights reserved.
 
-use itertools::cloned;
 use bio::alignment::pairwise::banded::Aligner;
 use bio::alignment::pairwise::Scoring;
 use bio::alignment::sparse::*;
@@ -852,15 +851,12 @@ pub fn count(
                 gene_frq.entry(score.max_gene.clone()).or_insert(vec![0;nalleles+1])[score.max_allele] += 1;
                 nreads += 1.0;
             }
-			println!("{:?}",gene_frq);
             let mut max_gene_this_umi: Vec<u8> = Vec::new();
             let mut allele_offset: usize = 0;
             let mut max_reads_this_umi: usize = 0;
             for (g, frq) in gene_frq.into_iter() { // look at reads for each gene
 				let nalleles = genes_to_rownums[&g].1;
                 let nreads_g : usize = frq.iter().sum::<u8>() as usize;
-				println!("{:?}",frq);
-				println!("{} {}",nreads, nreads_g);
                 if nreads_g > max_reads_this_umi
                     && nreads_g as f64 > GENE_CONSENSUS_THRESHOLD * nreads
                 { // if this gene has the most reads so far and has more than GENE_CONSENSUS_THRESHOLD fraction of total reads
@@ -869,7 +865,6 @@ pub fn count(
 					allele_offset = nalleles; // assign to gene if none of the alleles pass the condition in the following loop
 					if nalleles > 1 { 
 						for (allele_num, read_count) in frq.iter().enumerate() {
-							println!("{:?}", (nreads_g as f64 - frq[nalleles] as f64 - *read_count as f64));
 							if (nalleles > allele_num) && // skip the last entry (corresponding to gene)
 							(*read_count as f64 > ALLELE_CONSENSUS_THRESHOLD * nreads_g as f64) &&
 							(ALLELE_CONSENSUS_THRESHOLD * nreads_g as f64 > (nreads_g as f64 - frq[nalleles] as f64 - *read_count as f64) ) { 
@@ -880,7 +875,6 @@ pub fn count(
 						allele_offset = 0; // offset is 0 if only one allele
 					}		 
                 }
-			println!("{}",allele_offset);
             }
             if !max_gene_this_umi.is_empty() {
                 matrix_row
