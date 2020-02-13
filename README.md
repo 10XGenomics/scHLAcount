@@ -115,6 +115,30 @@ Using multi-FASTA files of the coding and genomic sequences of alleles (generate
 
 Reads are then collated by molecule, which in 10x Genomics data comprises the 12bp cell barcode (CB) and 10bp unique molecular identifier (UMI). All reads sharing a CB and UMI originated from the same RNA molecule, but individual reads may have different equivalence classes according to the pseudoalignment. We only retain reads where the equivalence class corresponds to a single allele (in which case the read is assigned to that allele; e.g. HLA-A*02:01) or the two alleles of the same gene (the read is assigned to the gene; e.g. HLA-A). If at least half of the reads from a molecule are assigned to a particular gene, the molecule is assigned to that gene or one of its alleles using a consensus of the constituent reads’ equivalence classes. Now only considering the reads from the molecule assigned to the most prevalent gene, if both or neither allele have at least 10% of the reads, the molecule is assigned to the gene. Otherwise, the molecule is assigned to the more prevalent allele.
 
+## Advanced Parameter Specifications
+
+Default parameters were selected based on our test datasets with genotypes with two or three-field resolution, where we expect the personalized reference to have very few mismatches with the allele present in the reads. scHLAcount selects an arbitrary allele from the database consistent with the provided genotypes. If the genotypes provided are lower-resolution (e.g. the one-field genotype A\*02 is lower-resolution than the three-field genotype A\*02:01:01), scHLAcount arbitrarily selects a representative sequence from all A\*02 alleles. Therefore, when only lower-resolution genotypes are available, the pseudoalignments of reads to the personalized reference may contain more mismatches and users may want to decrease the k-mer length or decrease the minimum significant alignment length.
+
+k-mer length is set to 20 in the debruijn_mapping crate and can be changed in the configuration file of that crate [here](https://github.com/10XGenomics/rust-pseudoaligner/blob/master/src/config.rs). 
+
+Other scHLAcount-specific parameters are specified in our configuration file [here](https://github.com/10XGenomics/scHLAcount/blob/master/src/config.rs) and are described below.
+
+*Genotyping parameters*  
+MIN_SCORE_CALL - minimum length of pseudoalignment required to use a read in genotyping  
+Parameters prefixed with "EM" pertain to the expectation-maximization step of the genotyping algorithm.  
+MIN_READS_CALL - minimum number of reads required to be assigned to a gene in order to call a genotype  
+HOMOZYGOUS_TH - maximum proportion of reads assigned to an allele to call a homozygous genotype  
+PAIRS_TO_OUTPUT - in the genotyping output file, report this many allele pairs and their scores  
+WEIGHTS_TO_OUTPUT - in the genotyping output file, report this many alleles and their scores  
+
+*Molecule-counting parameters*  
+MIN_SCORE_COUNT_PSEUDO - minimum length of pseudoalignment required to use a read in molecule-counting  
+MIN_SCORE_COUNT_ALIGNMENT - minimum length of pseudoalignment required to use a read in molecule-counting  
+GENE_CONSENSUS_THRESHOLD - minimum proportion of reads in a UMI that must be assigned to (any alleles of) a single gene, otherwise the UMI is not counted  
+ALLELE_CONSENSUS_THRESHOLD - minimum proportion of reads in a UMI that must be assigned to the most prevalent allele, otherwise the UMI is counted at the gene level not at the allele level  
+
+The gene names for genotyping and molecule counting are specified in the code [here](https://github.com/10XGenomics/scHLAcount/blob/master/src/hla.rs#L108). 
+
 ## Future Work
 
 **General**
