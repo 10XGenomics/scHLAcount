@@ -119,9 +119,9 @@ Reads are then collated by molecule, which in 10x Genomics data comprises the 12
 
 Default parameters were selected based on our test datasets with genotypes with two or three-field resolution, where we expect the personalized reference to have very few mismatches with the allele present in the reads. scHLAcount selects an arbitrary allele from the database consistent with the provided genotypes. If the genotypes provided are lower-resolution (e.g. the one-field genotype A\*02 is lower-resolution than the three-field genotype A\*02:01:01), scHLAcount arbitrarily selects a representative sequence from all A\*02 alleles. Therefore, when only lower-resolution genotypes are available, the pseudoalignments of reads to the personalized reference may contain more mismatches and users may want to decrease the k-mer length or decrease the minimum significant alignment length.
 
-k-mer length is set to 20 in the debruijn_mapping crate and can be changed in the configuration file of that crate [here](https://github.com/10XGenomics/rust-pseudoaligner/blob/master/src/config.rs). 
+k-mer length is set to 20 in the debruijn_mapping crate. To change the k-mer length, you need to clone the repo of this crate, change [its configuration file](https://github.com/10XGenomics/rust-pseudoaligner/blob/master/src/config.rs), and change the [scHLAcount Cargo.toml file](https://github.com/10XGenomics/scHLAcount/blob/master/Cargo.toml#L11) to point to your local, modified version of the debruijn_mapping crate. Then you will need to re-compile the scHLAcount program.
 
-Other scHLAcount-specific parameters are specified in our configuration file [here](https://github.com/10XGenomics/scHLAcount/blob/master/src/config.rs) and are described below.
+Other scHLAcount-specific parameters are specified in our configuration file [here](https://github.com/10XGenomics/scHLAcount/blob/master/src/config.rs) and are described below. After changing the configuration file, you will need to re-compile the scHLAcount program.
 
 *Genotyping parameters*  
 MIN_SCORE_CALL - minimum length of pseudoalignment required to use a read in genotyping  
