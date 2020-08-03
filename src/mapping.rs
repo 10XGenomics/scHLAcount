@@ -233,12 +233,9 @@ impl Iterator for BamSeqReader {
             let r = self.reader.read(&mut self.tmp_record);
             let mut p: bool = true;
             if let Err(e) = r {
-                if e.is_eof() {
-                    return None;
-                } else {
-                    return Some(Err(e.into()));
-                }
+                return Some(Err(e.into()));
             };
+            if let Ok(false) = r { return None; } // EOF
             if self.tmp_record.is_secondary() || self.tmp_record.is_supplementary() {
                 p = false;
             }

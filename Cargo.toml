@@ -14,10 +14,7 @@ human-panic = "1.0.1"
 itertools = "0.8"
 log = "*"
 regex = "1"
-
-# todo: switch back to crates.io version after next release of rust-htslib
-rust-htslib = { git = "https://github.com/rust-bio/rust-htslib.git", rev="18072e0faf909ed19da4d1226a35c239a4b4292e" }
-
+rust-htslib = "0.25.0"
 serde = "1.0"
 simplelog = "0.5.0"
 sprs = "*"
