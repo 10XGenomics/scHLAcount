@@ -4,7 +4,7 @@ version = "0.1.0"
 authors = ["Charlotte Darby <cdarby@jhu.edu>", "Ian Fiddes <ian.t.fiddes@gmail.com>", "Patrick Marks <patrick@10xgenomics.com>"]
 
 [dependencies]
-bio = "0.25"
+bio = "0.31"
 clap = "*"
 csv = "1"
 debruijn = { git = "https://github.com/10XGenomics/rust-debruijn" }
@@ -14,7 +14,7 @@ human-panic = "1.0.1"
 itertools = "0.8"
 log = "*"
 regex = "1"
-rust-htslib = "0.25.0"
+rust-htslib = "0.32"
 serde = "1.0"
 simplelog = "0.5.0"
 sprs = "*"

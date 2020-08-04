@@ -50,7 +50,7 @@ impl BamSeqReader {
 
     pub fn fetch(&mut self, locus: &Locus) {
         let tid = self.reader.header().tid(locus.chrom.as_bytes()).unwrap();
-        self.reader.fetch(tid, locus.start, locus.end).unwrap();
+        self.reader.fetch(tid, locus.start as u64, locus.end as u64).unwrap();
     }
 
     pub fn fetch_str(&mut self, region: &[u8]) {
