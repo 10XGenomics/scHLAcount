@@ -1,7 +1,7 @@
 // Copyright (c) 2019 10x Genomics, Inc. All rights reserved.
 
 use debruijn_mapping::{config, pseudoaligner, utils};
-use failure::Error;
+use failure::{Error, format_err};
 use itertools::Itertools;
 
 use std::cmp::max;
@@ -9,6 +9,8 @@ use std::collections::{HashMap, HashSet};
 use std::fs::File;
 use std::io::{BufWriter, Write};
 use std::path::PathBuf;
+
+use log::{debug, info};
 
 use crate::config::{
     EqClass, EM_ABS_TH, EM_CARE_TH, EM_ITERS, EM_REL_TH, HOMOZYGOUS_TH, MIN_READS_CALL,

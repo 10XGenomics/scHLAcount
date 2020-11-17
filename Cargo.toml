@@ -2,6 +2,7 @@
 name = "sc_hla_count"
 version = "0.1.0"
 authors = ["Charlotte Darby <cdarby@jhu.edu>", "Ian Fiddes <ian.t.fiddes@gmail.com>", "Patrick Marks <patrick@10xgenomics.com>"]
+edition = "2018"
 
 [dependencies]
 bio = "0.31"

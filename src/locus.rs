@@ -1,9 +1,11 @@
 // Copyright (c) 2019 10x Genomics, Inc. All rights reserved.
 
-use failure::Error;
+use failure::{Error, format_err};
 use regex::Regex;
 use std::fmt;
 use std::str::FromStr;
+use serde::Deserialize;
+
 
 #[derive(PartialEq, Eq, Ord, PartialOrd, Hash, Debug, Deserialize, Clone)]
 pub struct Locus {
