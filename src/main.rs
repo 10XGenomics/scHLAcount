@@ -235,9 +235,10 @@ fn _main(cli_args: Vec<String>) -> Result<(), Error> {
     };
 
     info!(
-        "Initialized a {} features x {} cell barcodes matrix",
+        "Initialized a {} features x {} cell barcodes matrix. Allele set: {}",
         nrows,
-        cell_barcodes.len()
+        cell_barcodes.len(),
+        rownames.len(),
     );
 
     let mut matrix: TriMat<usize> = TriMat::new((nrows, cell_barcodes.len()));
