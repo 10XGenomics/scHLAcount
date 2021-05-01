@@ -18,6 +18,7 @@ use std::collections::{HashMap, HashSet};
 use std::fs::File;
 use std::io::{BufWriter, Write};
 use std::path::PathBuf;
+use failure::ResultExt;
 
 use crate::config::{
     Barcode, EqClass, Umi, ALLELE_CONSENSUS_THRESHOLD, GENE_CONSENSUS_THRESHOLD, MIN_SCORE_CALL,
@@ -48,13 +49,15 @@ impl BamSeqReader {
         }
     }
 
-    pub fn fetch(&mut self, locus: &Locus) {
-        let tid = self.reader.header().tid(locus.chrom.as_bytes()).unwrap();
-        self.reader.fetch(tid, locus.start, locus.end).unwrap();
+    pub fn fetch(&mut self, locus: &Locus) -> Result<(), Error> {
+        self.reader.fetch((locus.chrom.as_bytes(), locus.start as u64, locus.end as u64)).
+        context(format!("Error fetching locus {} from BAM file. Are you using a valid contig name?", locus.chrom))?;
+
+        Ok(())
     }
 
     pub fn fetch_str(&mut self, region: &[u8]) {
-        self.reader.fetch_str(&region).unwrap();
+        self.reader.fetch(&region).unwrap();
     }
 }
 
@@ -231,14 +234,16 @@ impl Iterator for BamSeqReader {
     fn next(&mut self) -> Option<Self::Item> {
         loop {
             let r = self.reader.read(&mut self.tmp_record);
+            if r.is_none() {
+                return None;
+            }
+            let r = r.unwrap();
+
             let mut p: bool = true;
             if let Err(e) = r {
-                if e.is_eof() {
-                    return None;
-                } else {
-                    return Some(Err(e.into()));
-                }
+                return Some(Err(e.into()));
             };
+
             if self.tmp_record.is_secondary() || self.tmp_record.is_supplementary() {
                 p = false;
             }
@@ -317,7 +322,7 @@ pub fn mapping_wrapper(
 
     if let Some(l) = locus {
         debug!("Locus: {:?}", l);
-        itr.fetch(l);
+        itr.fetch(l)?;
     }
 
     let mut hits_file = outdir.clone();
@@ -443,7 +448,7 @@ pub fn map_and_count_sw(
     let mut aligner = Aligner::with_scoring(scoring, K, W);
 
     let mut itr = BamSeqReader::new(IndexedReader::from_path(bam)?);
-    itr.fetch(locus);
+    itr.fetch(locus)?;
 
     // what equivalence class corresponds to a gene or an allele?
     let allele_parser = AlleleParser::new();
@@ -659,7 +664,7 @@ pub fn map_and_count_pseudo(
     info!("Built CDS index for pseudoalignment");
 
     let mut itr = BamSeqReader::new(IndexedReader::from_path(bam)?);
-    itr.fetch(locus);
+    itr.fetch(locus)?;
 
     // what equivalence class corresponds to a gene or an allele?
     let allele_parser = AlleleParser::new();

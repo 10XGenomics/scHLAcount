@@ -23,7 +23,7 @@ extern crate terminal_size;
 
 use clap::{App, Arg};
 
-use failure::Error;
+use failure::{Error, ResultExt};
 use simplelog::*;
 use sprs::io::write_matrix_market;
 use sprs::TriMat;
@@ -117,7 +117,7 @@ fn get_args() -> clap::App<'static, 'static> {
     .arg(Arg::with_name("log_level")
          .long("log-level")
          .possible_values(&["info", "debug", "error"])
-         .default_value("error")
+         .default_value("info")
          .help("Logging level"))
     .arg(Arg::with_name("primary_alignments")
          .long("primary-alignments")
@@ -139,6 +139,7 @@ fn main() {
     let res = _main(cli_args);
     if let Err(e) = res {
         println!("Failed with error: {}", e);
+        println!("Additional details\n:{:?}", e);
         process::exit(1);
     }
 }
@@ -195,24 +196,22 @@ fn _main(cli_args: Vec<String>) -> Result<(), Error> {
             let allele_status: PathBuf = [hla_db_dir, "Allele_status.txt"].iter().collect();
             let p_hla_index: PathBuf = [pseudoaligner_tmpdir,"hla_nuc.fasta.idx"].iter().collect();
             let hla_index_generated: PathBuf = make_hla_index(db_fasta,p_hla_index,allele_status).expect("Pseudoaligner index building failed");
-            (mapping_wrapper(hla_index_generated.clone(), p_tmpdir, bam_file.clone(), Some(&region), use_unmapped).expect("Pseudoalignment mapping failed"), hla_index_generated)
+            (mapping_wrapper(hla_index_generated.clone(), p_tmpdir, bam_file.clone(), Some(&region), use_unmapped)?, hla_index_generated)
         } else {
             check_inputs_exist_hla_idx(hla_index)?;
-            (mapping_wrapper(PathBuf::from(hla_index), p_tmpdir, bam_file.clone(), Some(&region), use_unmapped).expect("Pseudoalignment mapping failed"), PathBuf::from(hla_index))
+            (mapping_wrapper(PathBuf::from(hla_index), p_tmpdir, bam_file.clone(), Some(&region), use_unmapped)?, PathBuf::from(hla_index))
         };
 
         let cdsdb: PathBuf = [hla_db_dir, "hla_nuc.fasta"].iter().collect();
         let gendb: PathBuf = [hla_db_dir, "hla_gen.fasta"].iter().collect();
-        if let Ok(i) = em_wrapper(hla_index1, counts_file, cdsdb, gendb, pseudoaligner_tmpdir) {
-            genomic = i.0;
-            cds = i.1;
-        } else {
-            return Err(format_err!("EM/pseudoalignment-consensus step failed"));
-        }
+        let i = em_wrapper(hla_index1, counts_file, cdsdb, gendb, pseudoaligner_tmpdir).context("EM/pseudoalignment-consensus step failed")?;
+        genomic = i.0;
+        cds = i.1;
     }
+
     check_inputs_exist_fasta(&cds, &genomic)?;
 
-    let cell_barcodes = load_barcodes(&cell_barcodes).unwrap();
+    let cell_barcodes = load_barcodes(&cell_barcodes)?;
     let (entries, nrows, metrics, rownames) = if exact_count {
         map_and_count_sw(
             bam_file,
@@ -236,9 +235,10 @@ fn _main(cli_args: Vec<String>) -> Result<(), Error> {
     };
 
     info!(
-        "Initialized a {} features x {} cell barcodes matrix",
+        "Initialized a {} features x {} cell barcodes matrix. Allele set: {}",
         nrows,
-        cell_barcodes.len()
+        cell_barcodes.len(),
+        rownames.len(),
     );
 
     let mut matrix: TriMat<usize> = TriMat::new((nrows, cell_barcodes.len()));
@@ -281,7 +281,7 @@ fn _main(cli_args: Vec<String>) -> Result<(), Error> {
     debug!("Wrote reference matrix file");
 
     let d: PathBuf = [out_dir, "summary.tsv"].iter().collect();
-    let mut summary_file = BufWriter::new(File::create(d).unwrap());
+    let mut summary_file = BufWriter::new(File::create(d)?);
     let m: sprs::CsMat<usize> = matrix.to_csr();
     for (row_ind, row_vec) in m.outer_iterator().enumerate() {
         let mut s = 0;
