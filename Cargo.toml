@@ -20,6 +20,7 @@ simplelog = "0.5.0"
 sprs = "*"
 tempfile = "*"
 terminal_size = "*"
+flate2 = "1"
 
 [dependencies.smallvec]
 features = ["serde"]

@@ -52,6 +52,8 @@ use locus::Locus;
 mod config;
 use config::Barcode;
 
+mod io;
+
 fn get_args() -> clap::App<'static, 'static> {
     App::new("scHLAcount")
     .set_term_width(if let Some((Width(w), _)) = terminal_size() { w as usize } else { 120 })
@@ -401,7 +403,7 @@ pub fn check_inputs_exist_hla_idx(path: &str) -> Result<(), Error> {
 /* Helper Functions */
 
 pub fn load_barcodes(filename: impl AsRef<Path>) -> Result<HashMap<Barcode, u32>, Error> {
-    let r = File::open(filename.as_ref())?;
+    let r = io::open_file(filename)?;
     let reader = BufReader::with_capacity(32 * 1024, r);
 
     let mut bc_set = HashMap::new();
