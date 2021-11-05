@@ -177,6 +177,7 @@ fn _main(cli_args: Vec<String>) -> Result<(), Error> {
     let _ = SimpleLogger::init(ll, Config::default());
 
     check_inputs_exist(bam_file, cell_barcodes, out_dir)?;
+
     let region: Locus = Locus::from_str(region).expect("Failed to parse region string");
     let (mut genomic, mut cds): (PathBuf, PathBuf) =
         (PathBuf::from(fasta_file_gen), PathBuf::from(fasta_file_cds));

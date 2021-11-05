@@ -51,7 +51,7 @@ impl BamSeqReader {
 
     pub fn fetch(&mut self, locus: &Locus) -> Result<(), Error> {
         self.reader.fetch((locus.chrom.as_bytes(), locus.start as u64, locus.end as u64)).
-        context(format!("Error fetching locus {} from BAM file. Are you using a valid contig name?", locus.chrom))?;
+        context(format!("Error fetching locus {} from BAM file. Are you using a valid contig name? Check for '6' vs 'chr6'.", locus.chrom))?;
 
         Ok(())
     }
